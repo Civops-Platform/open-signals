@@ -108,7 +108,9 @@ is not republishing, so the gate doesn't apply there.
 | `epa-echo` | major EPA-regulated facilities in a state, with compliance status and penalties | — |
 | `openfda-recalls` | FDA food, drug and device recalls of the last 60 days, at the firm's ZIP | — |
 | `usaspending` | the 100 largest new federal contract awards of the last 30 days, at the place-of-performance ZIP | — |
-| `gbif` | open-licensed (CC0, CC-BY) wildlife and plant observations of the last two weeks, by group and box | — |
+| `gbif` | open-licensed (CC0, CC-BY) wildlife and plant observations of the last two weeks, worldwide, by group and box | — |
+| `nasa-eonet` | open natural events worldwide (storms, wildfires, volcanoes, floods, ice), latest position | — |
+| `world-bank` | World Bank indicators by country at the capital: GDP growth, inflation, manufacturing, exports, FDI, unemployment | — |
 | `noaa-coops` | water levels at any CO-OPS station (LWD on the Great Lakes, MLLW on tidal stations) | — |
 | `usgs-water` | river discharge and gage height at any USGS gauge | — |
 | `glerl` | Great Lakes ice cover (December to May) | — |

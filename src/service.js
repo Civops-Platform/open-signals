@@ -21,7 +21,7 @@ const MAX_ADHOC_PLACES = 10;
 const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
-  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60,
+  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -130,7 +130,7 @@ export function createService({ fetch: fetchFn = globalThis.fetch, env = process
     const date = q.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now());
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'date must be YYYY-MM-DD');
     const r = await run(L.source, q, opts);
-    const rs = r.readings.filter((x) => x.metric === L.metric && x.place);
+    const rs = r.readings.filter((x) => (!L.metric || x.metric === L.metric) && x.place); // no metric: the source's one series (e.g. the chosen indicator)
     const s = catalogSource(L.source);
     const base = { type: 'FeatureCollection', layer: id, label: L.label, unit: L.unit, ...(L.read ? { read: L.read } : {}), status: r.status,
       source: { id: s.id, name: s.name, license: s.license, ...(s.attribution ? { attribution: s.attribution } : {}) } };
@@ -216,7 +216,11 @@ export const LAYERS = {
   contract_awards: { label: 'New federal contract awards', source: 'usaspending', metric: 'contract_award', unit: 'USD', value: valueOf, events: true,
     extra: (r) => ({ recipient: r.fields.recipient, agency: r.fields.agency }), read: 'The 100 largest new contracts of the last 30 days, at the place-of-performance ZIP.' },
   wildlife: { label: 'Wildlife and plant observations (GBIF)', source: 'gbif', metric: 'observation', unit: 'individuals', value: valueOf, events: true,
-    extra: (r) => ({ species: r.fields.species, class: r.fields.class, kingdom: r.fields.kingdom }), read: 'The last two weeks, open-licensed records identified to species, inside bbox (default the lower 48); group= picks birds, mammals, plants and so on.' },
+    extra: (r) => ({ species: r.fields.species, class: r.fields.class, kingdom: r.fields.kingdom }), read: 'The last two weeks, open-licensed records identified to species, inside bbox (default the whole world); group= picks birds, mammals, plants and so on.' },
+  natural_events: { label: 'Natural events worldwide (NASA EONET)', source: 'nasa-eonet', metric: 'natural_event', unit: 'varies', value: valueOf, events: true,
+    extra: (r) => ({ category: r.fields.category, category_title: r.fields.category_title }), read: 'Open storms, wildfires, volcanoes, floods, ice and dust events; the latest position of each.' },
+  world_bank: { label: 'World Bank indicators by country', source: 'world-bank', metric: null, unit: 'varies', value: valueOf, events: true,
+    extra: (r) => ({ indicator: r.fields.label, year: r.fields.year, region: r.fields.region }), read: 'Latest annual value per economy, at its capital; indicator= picks gdp_growth, inflation, manufacturing, exports, fdi or unemployment.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
 };

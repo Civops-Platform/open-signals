@@ -342,3 +342,31 @@ test('gbif: open licences only, species-level only, no observer names; group and
   await gbif.fetch(ctx(g, { params: { group: 'dragons' } }));
   assert.ok(!/classKey|kingdomKey/.test(g.calls[0].url), 'an unknown group means all');
 });
+
+import { nasaEonet, worldBank } from '../src/fetchers/global.js';
+test('nasa-eonet: latest point position of each open event; events without a point are skipped', async () => {
+  const f = stubFetch([[/eonet/, () => res(200, { events: [
+    { id: 'E1', title: 'Hurricane Simon', link: 'https://eonet.gsfc.nasa.gov/api/v3/events/E1', categories: [{ id: 'severeStorms', title: 'Severe Storms' }], sources: [{ id: 'JTWC' }],
+      geometry: [{ type: 'Point', date: '2026-10-09T12:00:00Z', coordinates: [-100, 15], magnitudeValue: 90, magnitudeUnit: 'kts' }, { type: 'Point', date: '2026-10-10T12:00:00Z', coordinates: [-104.8, 17.3], magnitudeValue: 130, magnitudeUnit: 'kts' }] },
+    { id: 'E2', title: 'Area', categories: [], geometry: [{ type: 'Polygon', date: '2026-10-10', coordinates: [] }] },
+  ] })]]);
+  const { readings } = await nasaEonet.fetch(ctx(f));
+  valid(readings);
+  assert.equal(readings.length, 1);
+  assert.deepEqual([readings[0].place.lng, readings[0].place.lat, readings[0].value], [-104.8, 17.3, 130]);
+});
+
+test('world-bank: latest value per economy at its capital; aggregates (no capital) and nulls dropped; indicator closed set', async () => {
+  const f = stubFetch([
+    [/\/v2\/country\?/, () => res(200, [{}, [
+      { id: 'MEX', name: 'Mexico', region: { id: 'LCN', value: 'Latin America & Caribbean ' }, incomeLevel: { value: 'Upper middle income' }, latitude: '19.427', longitude: '-99.1276' },
+      { id: 'AFE', name: 'Africa Eastern and Southern', region: { id: 'NA', value: 'Aggregates' }, latitude: '', longitude: '' }]])],
+    [/indicator\/NV\.IND\.MANF\.ZS/, () => res(200, [{}, [
+      { countryiso3code: 'MEX', country: { id: 'MX' }, date: '2025', value: 20.44 }, { countryiso3code: 'AFE', date: '2025', value: 9 }, { countryiso3code: 'MEX', date: '2024', value: null }]])],
+  ]);
+  const { readings } = await worldBank.fetch(ctx(f, { params: { indicator: 'manufacturing' } }));
+  valid(readings);
+  assert.equal(readings.length, 1);
+  assert.equal(readings[0].value, 20.44);
+  assert.equal(readings[0].place.name, 'Mexico');
+});

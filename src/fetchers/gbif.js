@@ -6,17 +6,17 @@
  * No observer names are carried: attribution runs through the dataset, linked from each record.
  * Coordinates are as GBIF publishes them; sensitive species are already obscured upstream.
  *   params.group  all | birds | mammals | reptiles | amphibians | insects | plants | fungi
- *   params.bbox   xmin,ymin,xmax,ymax (default: the lower 48)
+ *   params.bbox   xmin,ymin,xmax,ymax (default: the whole world)
  */
 
 import { reading } from '../contract.js';
 import { getJson, localDate } from './http.js';
 
 const GROUPS = { birds: 'classKey=212', mammals: 'classKey=359', reptiles: 'classKey=11592253', amphibians: 'classKey=131', insects: 'classKey=216', plants: 'kingdomKey=6', fungi: 'kingdomKey=5' };
-const US48 = [-125, 24, -66, 50];
+const WORLD = [-180, -60, 180, 75];
 
 function bbox(v) {
-  if (v == null || v === '') return US48;
+  if (v == null || v === '') return WORLD;
   const b = String(v).split(',').map(Number);
   if (b.length !== 4 || b.some((n) => !Number.isFinite(n)) || b[0] >= b[2] || b[1] >= b[3] || Math.abs(b[0]) > 180 || Math.abs(b[2]) > 180 || Math.abs(b[1]) > 90 || Math.abs(b[3]) > 90) {
     throw Object.assign(new Error('bbox must be xmin,ymin,xmax,ymax in degrees'), { status: 400 });
@@ -27,7 +27,7 @@ function bbox(v) {
 export const gbif = {
   source: 'gbif',
   metrics: ['observation'],
-  places: 'observations inside params.bbox (default: the lower 48)',
+  places: 'observations inside params.bbox (default: the whole world)',
   params: { group: ['all', ...Object.keys(GROUPS)], bbox: 'xmin,ymin,xmax,ymax' },
   async fetch({ fetch: f, now, src, params = {} }) {
     const source = src('gbif');
