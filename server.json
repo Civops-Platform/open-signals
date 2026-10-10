@@ -1,10 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.civops-platform/open-signals",
+  "name": "io.github.Civops-Platform/open-signals",
   "title": "open-signals",
-  "description": "Public data signals (hazards, water, ice, weather, crops, EPA facilities) with source, fetch time and licence on every reading. Read-only.",
+  "description": "Public hazard, water, weather and EPA data with source, age and licence on every reading.",
   "version": "0.1.0",
-  "repository": { "url": "https://github.com/Civops-Platform/open-signals", "source": "github" },
+  "repository": {
+    "url": "https://github.com/Civops-Platform/open-signals",
+    "source": "github"
+  },
   "websiteUrl": "https://open-signals.civops.io",
-  "remotes": [{ "type": "streamable-http", "url": "https://open-signals.civops.io/mcp" }]
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://open-signals.civops.io/mcp"
+    }
+  ]
 }
