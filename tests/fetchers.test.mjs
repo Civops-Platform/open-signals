@@ -269,3 +269,57 @@ test('epa-echo: query id then GeoJSON; state is a closed set; significant non-co
   const bad = stubFetch([[/get_facilities/, () => res(200, { Results: { Error: { ErrorMessage: 'too many' } } })]]);
   await assert.rejects(epaEcho.fetch(ctx(bad)), /no query id/);
 });
+
+// ── Business events: openFDA recalls and USAspending awards, placed by ZIP ──
+import { openfdaRecalls, usaspendingAwards } from '../src/fetchers/business.js';
+import { zipCentroid } from '../src/fetchers/zip.js';
+
+test('zip centroids: five-digit ZIP (or ZIP+4) to [lng, lat]; anything else is null', () => {
+  const c = zipCentroid('62239-1351');
+  assert.ok(Array.isArray(c) && c[0] < -89 && c[0] > -91 && c[1] > 38 && c[1] < 39, JSON.stringify(c));
+  assert.equal(zipCentroid('ABCDE'), null);
+  assert.equal(zipCentroid(null), null);
+});
+
+test('openfda-recalls: one reading per recall at the firm ZIP; a 404 (nothing matched) is not an error; kind is a closed set', async () => {
+  const rec = { recall_number: 'D-0001-2027', recalling_firm: 'Sterling Pharmaceutical Services LLC', city: 'Dupo', state: 'IL', postal_code: '62239-1351',
+    classification: 'Class II', reason_for_recall: 'Lack of Assurance of Sterility', report_date: '20260930', recall_initiation_date: '20260820', status: 'Ongoing' };
+  const f = stubFetch([[/drug\/enforcement/, () => res(200, { results: [rec, { ...rec, recall_number: 'X', report_date: 'bad' }] })], [/(food|device)\/enforcement/, () => res(404, '{"error":{"code":"NOT_FOUND"}}')]]);
+  const { readings } = await openfdaRecalls.fetch(ctx(f));
+  assert.equal(f.calls.length, 3);
+  assert.match(f.calls[0].url, /report_date:%5B\d{8}\+TO\+\d{8}%5D/);
+  valid(readings);
+  assert.equal(readings.length, 1, 'a record without a report date is skipped');
+  assert.equal(readings[0].at, '2026-09-30');
+  assert.equal(readings[0].value, 2);
+  assert.equal(readings[0].place.state, 'IL');
+  const g = stubFetch([[/enforcement/, () => res(200, { results: [] })]]);
+  await openfdaRecalls.fetch(ctx(g, { params: { kind: 'device' } }));
+  assert.deepEqual(g.calls.map((c) => /\/(\w+)\/enforcement/.exec(c.url)[1]), ['device']);
+  const h = stubFetch([[/enforcement/, () => res(500, 'boom')]]);
+  await assert.rejects(openfdaRecalls.fetch(ctx(h)), /500/);
+});
+
+test('usaspending-awards: new awards only, the largest first, at the place-of-performance ZIP', async () => {
+  const f = stubFetch([[/spending_by_award/, (url, init) => {
+    const b = JSON.parse(init.body);
+    assert.equal(b.filters.time_period[0].date_type, 'new_awards_only');
+    return res(200, { results: [{ generated_internal_id: 'CONT_AWD_X', 'Award ID': 'X', 'Recipient Name': 'TRIWEST HEALTHCARE ALLIANCE CORP', 'Award Amount': 1200200000,
+      'Awarding Agency': 'Department of Veterans Affairs', 'Awarding Sub Agency': 'Department of Veterans Affairs', Description: 'COMMUNITY CARE', 'Start Date': '2026-08-01', 'Place of Performance Zip5': '22408', 'Place of Performance State Code': 'VA' }] });
+  }]]);
+  const { readings } = await usaspendingAwards.fetch(ctx(f));
+  valid(readings);
+  assert.equal(readings[0].value, 1200200000);
+  assert.match(readings[0].summary, /\$1200\.2M to TRIWEST/);
+  assert.equal(readings[0].place.state, 'VA');
+  assert.equal(f.calls[0].init.method, 'POST');
+});
+
+test('a 429 is retried once after Retry-After; a second 429 throws', async () => {
+  const { getJson } = await import('../src/fetchers/http.js');
+  let n = 0;
+  const once = async () => (++n === 1 ? { ...res(429, 'slow down'), headers: { get: () => '0' } } : res(200, { ok: true }));
+  assert.deepEqual(await getJson(once, 'https://x.test/a'), { ok: true });
+  const always = async () => ({ ...res(429, 'no'), headers: { get: () => '0' } });
+  await assert.rejects(getJson(always, 'https://x.test/b'), /429/);
+});

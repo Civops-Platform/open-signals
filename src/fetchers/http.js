@@ -1,13 +1,21 @@
 export const UA = 'open-signals (+https://github.com/Civops-Platform/open-signals)';
 
-/** GET JSON with a timeout. Non-2xx throws an Error carrying .status and .body. */
-export async function getJson(fetchFn, url, init = {}, timeoutMs = 20000) {
+/**
+ * GET JSON with a timeout. Non-2xx throws an Error carrying .status and .body.
+ * A 429 is retried once, after the upstream's Retry-After (capped at 10 s, default 3 s).
+ */
+export async function getJson(fetchFn, url, init = {}, timeoutMs = 20000, retried = false) {
   const res = await fetchFn(url, {
     ...init,
     headers: { 'User-Agent': UA, Accept: 'application/json', ...(init.headers || {}) },
     signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await res.text();
+  if (res.status === 429 && !retried) {
+    const wait = Math.min(10, Number(res.headers?.get?.('retry-after')) || 3) * 1000;
+    await new Promise((r) => setTimeout(r, wait));
+    return getJson(fetchFn, url, init, timeoutMs, true);
+  }
   if (!res.ok) {
     const err = new Error(`${res.status} from ${new URL(url).host}: ${text.slice(0, 200)}`);
     err.status = res.status;

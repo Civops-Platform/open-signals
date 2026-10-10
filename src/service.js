@@ -21,7 +21,7 @@ const MAX_ADHOC_PLACES = 10;
 const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
-  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720,
+  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -211,6 +211,10 @@ export const LAYERS = {
   epa_facilities: { label: 'Major EPA-regulated facilities', source: 'epa-echo', metric: 'facility_compliance', unit: 'quarters with non-compliance (of 12)', value: valueOf, events: true,
     extra: (r) => ({ compliance_status: r.fields.compliance_status, significant_noncomplier: r.fields.significant_noncomplier, naics: r.fields.naics, last_inspection: r.fields.last_inspection }),
     read: 'Major air, water and hazardous-waste permit holders in one state (state=XX, default OH). What EPA has recorded, not a finding about the facility today.' },
+  recalls: { label: 'FDA recalls (food, drugs, devices)', source: 'openfda-recalls', metric: 'recall', unit: 'FDA class', value: valueOf, events: true,
+    extra: (r) => ({ kind: r.fields.kind, classification: r.fields.classification, firm: r.fields.recalling_firm }), read: 'At the recalling firm’s ZIP (its centre, not the building). Class I is the most serious.' },
+  contract_awards: { label: 'New federal contract awards', source: 'usaspending', metric: 'contract_award', unit: 'USD', value: valueOf, events: true,
+    extra: (r) => ({ recipient: r.fields.recipient, agency: r.fields.agency }), read: 'The 100 largest new contracts of the last 30 days, at the place-of-performance ZIP.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
 };

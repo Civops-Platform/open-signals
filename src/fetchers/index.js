@@ -16,7 +16,8 @@ import { usdaNass } from './usda-nass.js';
 import { usgsEarthquakes } from './usgs-earthquakes.js';
 import { usgsVolcanoes, noaaNwps } from './hazards.js';
 import { epaEcho } from './epa-echo.js';
+import { openfdaRecalls, usaspendingAwards } from './business.js';
 
 export const FETCHERS = Object.fromEntries(
-  [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho].map((x) => [x.source, x]),
+  [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho, openfdaRecalls, usaspendingAwards].map((x) => [x.source, x]),
 );
