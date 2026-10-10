@@ -9,6 +9,7 @@
  *   TRUST_PROXY                1 = take the client IP from X-Forwarded-For
  *   NASS_API_KEY, EBIRD_API_KEY  upstream keys, if you want those sources
  *   OPEN_SIGNALS_DATA_DIR      folder with index.json of static datasets (optional; see src/datasets.js)
+ *   I3X_TOKENS                 JSON token table that turns on the CESMII i3X endpoint at /i3x/v1
  */
 
 import http from 'node:http';
@@ -19,10 +20,11 @@ import { handleRpc, MCP_DESCRIPTION } from './mcp.js';
 import { openapi } from './openapi.js';
 import { createDatasets } from './datasets.js';
 import { zipCentroid } from './fetchers/zip.js';
+import { createI3x } from './i3x.js';
 
 const MAX_BODY = 1_000_000;
 
-export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }) } = {}) {
+export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }), i3x = createI3x({ service, env }) } = {}) {
   const limit = Number(env.RATE_LIMIT_PER_MIN || 60);
   const hits = new Map();
 
@@ -71,7 +73,7 @@ export function createServer({ service = createService(), env = process.env, log
         name: 'open-signals',
         about: 'Public data signals with provenance and licence on every reading, as REST, MCP and GeoJSON.',
         catalogue: { sources: SOURCES.length, fetchable: service.fetchableIds('serve').length, hubs: HUBS.length, places: PLACES.length, datasets: datasets.list().length },
-        endpoints: ['/v1/sources', '/v1/sources/{id}', '/v1/hubs', '/v1/places', '/v1/readings?source={id}', '/v1/layers', '/v1/layers/{id}', '/v1/datasets', '/v1/datasets/{id}/{part}', '/mcp', '/openapi.json', '/health'],
+        endpoints: ['/i3x/v1 (CESMII i3X 1.0)', '/v1/sources', '/v1/sources/{id}', '/v1/hubs', '/v1/places', '/v1/readings?source={id}', '/v1/layers', '/v1/layers/{id}', '/v1/datasets', '/v1/datasets/{id}/{part}', '/mcp', '/openapi.json', '/health'],
         repository: 'https://github.com/Civops-Platform/open-signals',
         terms: 'Provided as is, no warranty. Readings pass on upstream data as published; each carries its own licence. Not for navigation or safety decisions.',
       });
@@ -122,6 +124,11 @@ export function createServer({ service = createService(), env = process.env, log
     const ip = (env.TRUST_PROXY === '1' && req.headers['x-forwarded-for']?.split(',')[0].trim()) || req.socket.remoteAddress || 'unknown';
     if (rateLimited(ip)) return send(res, 429, { error: 'rate limit' }, { 'Retry-After': '60' });
     const url = new URL(req.url, 'http://localhost');
+    if (url.pathname === '/i3x/v1' || url.pathname.startsWith('/i3x/v1/')) {
+      // CESMII i3X 1.0 (read-only); its own auth, rate budget and error shapes (src/i3x.js).
+      const raw = req.method === 'POST' ? await readBody(req).catch(() => '\u0000'.repeat(1 << 21)) : '';
+      return i3x.handle(req, res, url, raw);
+    }
     try {
       await route(req, res, url);
     } catch (e) {

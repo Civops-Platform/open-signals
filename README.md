@@ -58,6 +58,17 @@ CLI prints each source's licence so you know what you may do with what you fetch
 | `GET /v1/layers` · `GET /v1/layers/{id}?date=` | map layers as GeoJSON |
 | `GET /openapi.json` | the full description |
 
+### CESMII i3X
+
+The same layers are served as a read-only [CESMII i3X 1.0](https://github.com/cesmii/i3X) endpoint at
+`https://open-signals.civops.io/i3x/v1`. The address space has a root, one folder per layer, and one
+object per place or event. Each object's value is its latest reading (value, quality, timestamp) with
+source and licence, and its history is every reading held for that place. Subscriptions support sync
+and server-sent-event streams.
+
+The spec requires authentication on data endpoints, so there is a free public read-only token:
+`os-public-read` (send `Authorization: Bearer os-public-read`). `GET /i3x/v1/info` needs none.
+
 ### Static datasets
 
 Data that changes slowly is served as GeoJSON files rather than fetched live: wildfire burn

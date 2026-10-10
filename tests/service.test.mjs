@@ -239,3 +239,45 @@ test('zip lookup: a US ZIP answers its ZCTA centre; anything else is 404', async
     assert.equal((await fetch(`${base}/v1/zip/K1A0B1`)).status, 404);
   });
 });
+
+// ── CESMII i3X ──
+test('i3X: /info open; data needs a token; address space, value, history, subscription sync; writes 501', async () => {
+  const env = { I3X_TOKENS: JSON.stringify({ t1: { label: 'test' } }) };
+  const service = createService({ fetch: stubFetch([[/earthquake/, () => res(200, quakes)], [/volcanoes|eonet|water|glerl|fda|usaspending|gbif|worldbank|tidesandcurrents/, () => res(500, 'off')]]), env, now: () => NOW });
+  const srv = createServer({ service, env, log: { error() {} } }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  const base = `http://127.0.0.1:${srv.address().port}/i3x/v1`;
+  const H = { Authorization: 'Bearer t1', 'Content-Type': 'application/json' };
+  const post = (p, b) => fetch(base + p, { method: 'POST', headers: H, body: JSON.stringify(b) }).then((r) => r.json());
+  try {
+    const info = await (await fetch(`${base}/info`)).json();
+    assert.equal(info.result.specVersion, '1.0');
+    assert.equal(info.result.capabilities.update.current, false);
+    assert.equal((await fetch(`${base}/namespaces`)).status, 401);
+    const objs = await (await fetch(`${base}/objects?typeElementId=os:type:earthquakes`, { headers: H })).json();
+    assert.equal(objs.result.length, 1);
+    const id = objs.result[0].elementId;
+    const v = await post('/objects/value', { elementIds: [id, 'nope'] });
+    assert.equal(v.results[0].result.value.value, 2.4);
+    assert.equal(v.results[0].result.quality, 'Good');
+    assert.equal(v.results[1].responseDetail.status, 404);
+    const h = await post('/objects/history', { elementIds: [id], startTime: '2026-10-01T00:00:00Z', endTime: '2026-10-11T00:00:00Z' });
+    assert.equal(h.results[0].result.values.length, 1);
+    const rel = await post('/objects/related', { elementIds: [id] });
+    assert.equal(rel.results[0].result[0].sourceRelationship, 'HasParent');
+    const sub = await post('/subscriptions', { clientId: 'c1' });
+    const sid = sub.result.subscriptionId;
+    await post('/subscriptions/register', { clientId: 'c1', subscriptionId: sid, elementIds: [id] });
+    const sync = await post('/subscriptions/sync', { clientId: 'c1', subscriptionId: sid });
+    assert.equal(sync.result[0].updates[0].elementId, id);
+    assert.equal((await post('/subscriptions/sync', { clientId: 'other', subscriptionId: sid })).responseDetail.status, 404, 'a subscription belongs to its client');
+    const put = await fetch(`${base}/objects/value`, { method: 'PUT', headers: H, body: '{"updates":[]}' });
+    assert.equal(put.status, 501);
+    const gz = await fetch(`${base}/namespaces`, { headers: { ...H, 'Accept-Encoding': 'gzip' } });
+    assert.equal(gz.headers.get('content-encoding'), 'gzip');
+  } finally { srv.close(); }
+});
+
+test('i3X is off (404) without a token table', async () => {
+  await withServer({}, [], async (base) => { assert.equal((await fetch(`${base}/i3x/v1/info`)).status, 404); });
+});
