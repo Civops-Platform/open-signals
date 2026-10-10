@@ -8,7 +8,7 @@ Add one entry to `catalog/sources.json`. Every field matters:
 
 - `id`: lowercase kebab-case, stable forever
 - `name`, `homepage`, `api` (null if there's only a download)
-- `topics`: reuse existing topics (`npx open-signals sources --json | jq '.[].topics[]' | sort -u`)
+- `topics`: reuse existing topics (`node bin/open-signals.mjs sources --json | jq '.[].topics[]' | sort -u`)
 - `coverage`, `cadence`
 - `auth`: null, or `{ "env": "VAR_NAME", "how": "where to get it" }`
 - `license`: `public_domain` | `open` | `non_commercial` | `restricted` | `unknown`

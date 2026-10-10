@@ -32,13 +32,15 @@ serves only public-domain and open sources, holds no upstream keys, and is rate-
 Try `https://open-signals.civops.io/v1/layers/volcanoes?elevated=true`.
 
 ```bash
-npx open-signals sources fires                     # search the catalogue
-npx open-signals sources --topic water --fetchable
-npx open-signals fetch usgs-earthquakes --min 4.5 --window week
-npx open-signals fetch noaa-coops --coops 8518750   # any CO-OPS station
-npx open-signals fetch open-meteo --lat 41.5 --lng -81.7
-npx open-signals layer water_level                 # GeoJSON
-npx open-signals serve --port 3290                 # REST + MCP
+git clone https://github.com/Civops-Platform/open-signals && cd open-signals   # Node 20+, no npm install needed
+alias open-signals='node bin/open-signals.mjs'
+open-signals sources fires                     # search the catalogue
+open-signals sources --topic water --fetchable
+open-signals fetch usgs-earthquakes --min 4.5 --window week
+open-signals fetch noaa-coops --coops 8518750   # any CO-OPS station
+open-signals fetch open-meteo --lat 41.5 --lng -81.7
+open-signals layer water_level                 # GeoJSON
+open-signals serve --port 3290                 # REST + MCP
 ```
 
 `fetch` and `layer` run on your machine with your own keys (`NASS_API_KEY`, `EBIRD_API_KEY`). The
