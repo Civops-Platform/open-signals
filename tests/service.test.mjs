@@ -176,3 +176,9 @@ test('every layer names a source with a fetcher, and catalogue places all sit on
   for (const [id, L] of Object.entries(LAYERS)) assert.ok(FETCHERS[L.source], id);
   assert.ok(PLACES.every((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)));
 });
+
+test('a fetcher rejecting its own parameter is a 400, an upstream 400 is not', async () => {
+  const svc = createService({ fetch: stubFetch([[/api\.water\.noaa\.gov/, () => res(400, 'upstream says no')]]), env: {}, now: () => NOW });
+  await assert.rejects(svc.readings('noaa-nwps', { bbox: 'nonsense' }), (e) => e instanceof HttpError && e.status === 400);
+  await assert.rejects(svc.readings('noaa-nwps', {}), (e) => !(e instanceof HttpError) && e.status === 400 && e.body === 'upstream says no');
+});

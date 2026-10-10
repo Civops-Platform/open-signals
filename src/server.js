@@ -12,7 +12,8 @@
 
 import http from 'node:http';
 import { SOURCES, HUBS, PLACES, searchSources, topics } from './catalog.js';
-import { createService, HttpError } from './service.js';
+import { createService } from './service.js';
+import { HttpError } from './errors.js';
 import { handleRpc, MCP_DESCRIPTION } from './mcp.js';
 import { openapi } from './openapi.js';
 

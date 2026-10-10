@@ -49,6 +49,9 @@ export const TOOLS = [
       since: { type: 'string', description: 'ISO date or datetime; only readings at or after it.' },
       forecast: { type: 'boolean', description: 'false drops modelled future values.' },
       window: { type: 'string', description: 'usgs-earthquakes only: hour | day | week.' },
+      state: { type: 'string', description: 'epa-echo only: two-letter US state, default OH.' },
+      bbox: { type: 'string', description: 'noaa-nwps only: xmin,ymin,xmax,ymax in degrees (≤400 sq deg); default the Great Lakes basin.' },
+      elevated: { type: 'boolean', description: 'usgs-volcanoes only: true keeps volcanoes above normal.' },
       min: { type: 'string', description: 'usgs-earthquakes only: all | 1.0 | 2.5 | 4.5 | significant.' },
       limit: { type: 'number', description: '1-1000, default 100.' },
     }, required: ['source'] },
@@ -57,7 +60,7 @@ export const TOOLS = [
   {
     name: 'get_layer',
     description: 'One map layer as a GeoJSON FeatureCollection: one point per place with the reading on the date (else the latest observed before it, never a guess), or one point per event for event layers.',
-    inputSchema: { type: 'object', properties: { id: { type: 'string', enum: Object.keys(LAYERS) }, date: { type: 'string', description: 'YYYY-MM-DD; default today (US Eastern).' }, ...placeArgs, window: { type: 'string' }, min: { type: 'string' } }, required: ['id'] },
+    inputSchema: { type: 'object', properties: { id: { type: 'string', enum: Object.keys(LAYERS) }, date: { type: 'string', description: 'YYYY-MM-DD; default today (US Eastern).' }, ...placeArgs, window: { type: 'string' }, min: { type: 'string' }, state: { type: 'string' }, bbox: { type: 'string' }, elevated: { type: 'boolean' } }, required: ['id'] },
   },
 ];
 

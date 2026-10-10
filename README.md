@@ -48,7 +48,7 @@ CLI prints each source's licence so you know what you may do with what you fetch
 | `GET /v1/sources/{id}` | one entry |
 | `GET /v1/hubs` | projects that collect sources (below) |
 | `GET /v1/places?tag=` | named places as GeoJSON |
-| `GET /v1/readings?source={id}&place=&tag=&lat=&lng=&coops=&usgs=&ebird=&metric=&since=&limit=` | readings |
+| `GET /v1/readings?source={id}&place=&tag=&lat=&lng=&coops=&usgs=&ebird=&state=&bbox=&metric=&since=&limit=` | readings |
 | `GET /v1/layers` · `GET /v1/layers/{id}?date=` | map layers as GeoJSON |
 | `GET /openapi.json` | the full description |
 
@@ -87,6 +87,9 @@ is not republishing, so the gate doesn't apply there.
 | source | what | key |
 |---|---|---|
 | `usgs-earthquakes` | worldwide earthquakes, by window and magnitude floor | — |
+| `usgs-volcanoes` | alert level and aviation colour code for every monitored US volcano | — |
+| `noaa-nwps` | river stage and flood category (observed and forecast) at every NOAA gauge in a box | — |
+| `epa-echo` | major EPA-regulated facilities in a state, with compliance status and penalties | — |
 | `noaa-coops` | water levels at any CO-OPS station (LWD on the Great Lakes, MLLW on tidal stations) | — |
 | `usgs-water` | river discharge and gage height at any USGS gauge | — |
 | `glerl` | Great Lakes ice cover (December to May) | — |

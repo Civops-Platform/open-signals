@@ -35,6 +35,11 @@ try {
   say(quake.status === 200 && Array.isArray(gj.features), `GET /v1/layers/earthquakes → ${quake.status}, ${gj.features?.length} features`);
   const lvl = await fetch(`${base}/v1/layers/water_level`);
   say(lvl.status === 200, `GET /v1/layers/water_level → ${lvl.status}, ${(await lvl.json()).features?.length} features`);
+  for (const id of ['volcanoes', 'flood_gauges', 'epa_facilities']) {
+    const r = await fetch(`${base}/v1/layers/${id}`);
+    const j = await r.json();
+    say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${id} → ${r.status}, ${j.features?.length} features${j.error ? ` (${j.error})` : ''}`);
+  }
   const gated = await fetch(`${base}/v1/readings?source=open-meteo&lat=41.5&lng=-81.7`);
   say(gated.status === 451, `GET /v1/readings?source=open-meteo (public mode) → ${gated.status} (expected 451)`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json' },

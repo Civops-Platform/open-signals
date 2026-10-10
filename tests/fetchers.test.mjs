@@ -193,3 +193,79 @@ test('usgs-earthquakes: one reading per event at its epicentre; malformed featur
   await usgsEarthquakes.fetch(ctx(g, { params: { window: 'month; rm -rf', min: 'x' } }));
   assert.match(g.calls[0].url, /all_day\.geojson$/, 'unknown params fall back, never reach the URL');
 });
+
+// ── Gap-filling layers (2026-10-10): volcanoes, river flood status, EPA facilities ──
+import { usgsVolcanoes, noaaNwps, parseBbox } from '../src/fetchers/hazards.js';
+import { epaEcho } from '../src/fetchers/epa-echo.js';
+
+const VOLC = [
+  { vnum: '311120', volcano_name: 'Great Sitkin', region: 'Alaska - Aleutians', latitude: 52.0765, longitude: -176.1109, elevation_meters: 1740, volcano_url: 'https://avo.alaska.edu/x' },
+  { vnum: '311320', volcano_name: 'Akutan', region: 'Alaska - Aleutians', latitude: 54.134, longitude: -165.986 },
+];
+const MON = [
+  { vnum: '311120', volcano_name: 'Great Sitkin', alert_level: 'WATCH', color_code: 'ORANGE', sent_utc: '2026-10-09 20:34:00', notice_identifier: 'N1', notice_url: 'https://volcanoes.usgs.gov/hans-public/notice/N1', obs_fullname: 'Alaska Volcano Observatory' },
+  { vnum: '311320', volcano_name: 'Akutan', alert_level: 'NORMAL', color_code: 'GREEN', sent_utc: '2019-09-06 18:29:39', notice_identifier: 'N0' },
+  { vnum: '999999', volcano_name: 'Nowhere', alert_level: 'ADVISORY', color_code: 'YELLOW', sent_utc: '2026-01-01 00:00:00' },
+];
+
+test('usgs-volcanoes: alert level ranked 0–3 at the volcano\'s position; unpositioned skipped; elevated filter', async () => {
+  const f = stubFetch([[/getUSVolcanoes/, () => res(200, VOLC)], [/getMonitoredVolcanoes/, () => res(200, MON)]]);
+  const { readings } = await usgsVolcanoes.fetch(ctx(f));
+  valid(readings);
+  assert.equal(readings.length, 2, 'a monitored volcano with no position is skipped, not placed at 0,0');
+  const gs = readings.find((r) => r.place.name === 'Great Sitkin');
+  assert.equal(gs.value, 2);
+  assert.equal(gs.at, '2026-10-09T20:34:00.000Z');
+  assert.equal(gs.fields.color_code, 'ORANGE');
+  const f2 = stubFetch([[/getUSVolcanoes/, () => res(200, VOLC)], [/getMonitoredVolcanoes/, () => res(200, MON)]]);
+  const { readings: up } = await usgsVolcanoes.fetch(ctx(f2, { params: { elevated: 'true' } }));
+  assert.deepEqual(up.map((r) => r.place.name), ['Great Sitkin']);
+});
+
+const gauge = (lid, primary, cat, fcat = 'fcst_not_current', valid = '2026-10-10T18:15:00Z') => ({
+  lid, name: `Gauge ${lid}`, latitude: 41.9, longitude: -83.98, state: { abbreviation: 'MI' }, rfc: { abbreviation: 'NCRFC' },
+  status: { observed: { primary, primaryUnit: 'ft', secondary: 0.174, secondaryUnit: 'kcfs', floodCategory: cat, validTime: valid },
+    forecast: { primary: fcat === 'fcst_not_current' ? -999 : 9.1, primaryUnit: 'ft', floodCategory: fcat, validTime: '0001-01-01T00:00:00Z' } },
+});
+
+test('noaa-nwps: stage and flood category per gauge; -999 and year-0001 sentinels are not readings', async () => {
+  const f = stubFetch([[/api\.water\.noaa\.gov/, () => res(200, { gauges: [
+    gauge('ADRM4', 4.56, 'no_flooding'), gauge('X1', 12.2, 'minor', 'moderate'), gauge('X2', -999, 'obs_not_current'), gauge('X3', 3, 'no_flooding', 'fcst_not_current', '0001-01-01T00:00:00Z'),
+  ] })]]);
+  const { readings } = await noaaNwps.fetch(ctx(f));
+  valid(readings);
+  assert.match(f.calls[0].url, /bbox\.xmin=-93&bbox\.ymin=40&bbox\.xmax=-75&bbox\.ymax=49/);
+  assert.deepEqual(readings.map((r) => r.fields.lid), ['ADRM4', 'X1']);
+  const x1 = readings[1];
+  assert.equal(x1.fields.flood_rank, 2);
+  assert.equal(x1.fields.forecast_category, 'moderate');
+  assert.equal(readings[0].fields.forecast_category, null, 'no current forecast is null, not a category');
+});
+
+test('noaa-nwps: bbox is parsed, ordered and bounded', () => {
+  assert.deepEqual(parseBbox('-84,41,-82,42'), [-84, 41, -82, 42]);
+  assert.throws(() => parseBbox('-82,41,-84,42'), /bbox/);
+  assert.throws(() => parseBbox('1,2,3'), /bbox/);
+  assert.throws(() => parseBbox('-180,-90,180,90'), /larger than/);
+});
+
+test('epa-echo: query id then GeoJSON; state is a closed set; significant non-compliers flagged', async () => {
+  const f = stubFetch([
+    [/get_facilities/, () => res(200, { Results: { Message: 'Success', QueryID: '754', QueryRows: '2' } })],
+    [/get_geojson/, () => res(200, { type: 'FeatureCollection', features: [
+      { geometry: { coordinates: [-82.668, 39.734] }, properties: { RegistryID: '110000381989', FacName: '3 SIGMA LLC', FacCity: 'LANCASTER', FacState: 'OH', FacQtrsWithNC: 4, FacSNCFlg: 'Y', FacComplianceStatus: 'Violation Identified', FacTotalPenalties: '$12,000', FacDateLastInspection: '2025-11-06T00:00:00.000' } },
+      { geometry: { coordinates: [null, null] }, properties: { RegistryID: '2', FacName: 'No position' } },
+    ] })],
+  ]);
+  const { readings } = await epaEcho.fetch(ctx(f, { params: { state: 'oh; drop' } }));
+  assert.match(f.calls[0].url, /p_st=OH&p_maj=Y$/, 'an unknown state falls back to OH, never reaches the URL');
+  assert.match(f.calls[1].url, /qid=754/);
+  valid(readings);
+  assert.equal(readings.length, 1);
+  assert.equal(readings[0].value, 4);
+  assert.equal(readings[0].fields.significant_noncomplier, true);
+  assert.equal(readings[0].fields.last_inspection, '2025-11-06');
+  assert.match(readings[0].summary, /significant non-complier, penalties \$12,000/);
+  const bad = stubFetch([[/get_facilities/, () => res(200, { Results: { Error: { ErrorMessage: 'too many' } } })]]);
+  await assert.rejects(epaEcho.fetch(ctx(bad)), /no query id/);
+});

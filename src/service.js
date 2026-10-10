@@ -11,13 +11,9 @@ import { servable, placeRef } from './contract.js';
 import { PLACES, source as catalogSource } from './catalog.js';
 import { FETCHERS } from './fetchers/index.js';
 
-export class HttpError extends Error {
-  constructor(status, message, extra = {}) {
-    super(message);
-    this.status = status;
-    this.extra = extra;
-  }
-}
+import { HttpError } from './errors.js';
+
+export { HttpError };
 
 const MAX_ADHOC_PLACES = 10;
 
@@ -25,6 +21,7 @@ const MAX_ADHOC_PLACES = 10;
 const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
+  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -99,7 +96,14 @@ export function createService({ fetch: fetchFn = globalThis.fetch, env = process
     const hit = cache.get(key);
     const t = now();
     if (hit && hit.until > t.getTime()) return hit.result;
-    const result = await f.fetch({ fetch: fetchFn, env, now: t, places: ps, params, src: catalogSource });
+    let result;
+    try {
+      result = await f.fetch({ fetch: fetchFn, env, now: t, places: ps, params, src: catalogSource });
+    } catch (e) {
+      // A fetcher rejecting its own parameters is the caller's error; an upstream failure is not.
+      if (e.status === 400 && e.body === undefined) throw new HttpError(400, e.message);
+      throw e;
+    }
     if (result.status === 'ok' || result.status === 'off_season') {
       cache.set(key, { until: t.getTime() + (TTL_MIN[id] ?? 30) * 60_000, result });
     }
@@ -199,6 +203,14 @@ export const LAYERS = {
   ice: { label: 'Great Lakes ice cover', source: 'glerl', metric: 'lake_ice_cover', unit: '%', value: valueOf, read: 'Lake-wide percentage, published roughly December to May.' },
   sightings: { label: 'Waterfowl sightings (eBird)', source: 'ebird', metric: 'waterfowl_sightings', unit: 'birds in latest report', value: valueOf, group: 'species reported',
     read: 'Per region: each species with the count in its latest single report. Not totals; birder effort varies.' },
+  volcanoes: { label: 'US volcano alert levels', source: 'usgs-volcanoes', metric: 'volcano_alert', unit: 'alert level 0–3', value: valueOf, events: true,
+    extra: (r) => ({ alert_level: r.fields.alert_level, color_code: r.fields.color_code }), read: '0 normal/green, 1 advisory/yellow, 2 watch/orange, 3 warning/red. elevated=true keeps only those above normal.' },
+  flood_gauges: { label: 'River flood status (NOAA NWPS)', source: 'noaa-nwps', metric: 'river_flood_status', unit: 'stage', value: valueOf, events: true,
+    extra: (r) => ({ flood_category: r.fields.flood_category, flood_rank: r.fields.flood_rank, forecast_category: r.fields.forecast_category }),
+    read: 'One point per gauge in bbox (default the Great Lakes basin). flood_rank 0 none, 1 action, 2 minor, 3 moderate, 4 major.' },
+  epa_facilities: { label: 'Major EPA-regulated facilities', source: 'epa-echo', metric: 'facility_compliance', unit: 'quarters with non-compliance (of 12)', value: valueOf, events: true,
+    extra: (r) => ({ compliance_status: r.fields.compliance_status, significant_noncomplier: r.fields.significant_noncomplier, naics: r.fields.naics }),
+    read: 'Major air, water and hazardous-waste permit holders in one state (state=XX, default OH). What EPA has recorded, not a finding about the facility today.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
 };

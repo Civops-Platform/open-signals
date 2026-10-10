@@ -62,6 +62,7 @@ export const openapi = {
         parameters: [
           { ...qp('source', 'Source id with a fetcher'), required: true }, ...placeParams,
           qp('metric', 'Only this metric'), qp('since', 'ISO date or datetime'), qp('forecast', 'false drops forecasts'),
+          qp('state', 'epa-echo: two-letter US state'), qp('bbox', 'noaa-nwps: xmin,ymin,xmax,ymax'), qp('elevated', 'usgs-volcanoes: true | false'),
           qp('window', 'usgs-earthquakes: hour | day | week'), qp('min', 'usgs-earthquakes: all | 1.0 | 2.5 | 4.5 | significant'), qp('limit', '1-1000, default 100'),
         ],
         responses: { 200: json({ type: 'object', properties: { source: { type: 'string' }, status: { type: 'string', enum: ['ok', 'off_season', 'not_configured'] }, detail: { type: 'string' }, generated_at: { type: 'string' }, count: { type: 'integer' }, readings: { type: 'array', items: Reading } } }), ...errors },
@@ -71,7 +72,7 @@ export const openapi = {
     '/v1/layers/{id}': {
       get: {
         summary: 'One layer as GeoJSON',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', enum: Object.keys(LAYERS) } }, qp('date', 'YYYY-MM-DD'), ...placeParams, qp('window', 'event layers'), qp('min', 'event layers')],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', enum: Object.keys(LAYERS) } }, qp('date', 'YYYY-MM-DD'), ...placeParams, qp('window', 'event layers'), qp('min', 'event layers'), qp('state', 'epa_facilities'), qp('bbox', 'flood_gauges'), qp('elevated', 'volcanoes')],
         responses: { 200: { description: 'GeoJSON FeatureCollection', content: { 'application/geo+json': { schema: { type: 'object' } } } }, ...errors },
       },
     },

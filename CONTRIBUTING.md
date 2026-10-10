@@ -50,7 +50,7 @@ The rules, each enforced somewhere in the tests:
   failure throws.
 - **A missing value is `null`, never `0`.** Withheld, blank and "(NA)" all become null or are skipped.
 - **Ids are stable**: re-fetching the same observation gives the same id.
-- **Params are closed sets.** Nothing a caller sends reaches a URL unchecked.
+- **Params are closed sets or validated numbers** (a state list, a bounded bbox). Nothing a caller sends reaches a URL unchecked; a bad one throws with `status: 400` and no `body`, which the server answers as 400.
 - **Be polite to upstreams**: call them sequentially, set a timeout, and back off on 429.
 - Add a test in `tests/fetchers.test.mjs` with a canned upstream response, and a line in
   `scripts/live-check.mjs` passes on its own.
