@@ -67,7 +67,7 @@ source and licence, and its history is every reading held for that place. Subscr
 and server-sent-event streams.
 
 CESMII's conformance suite (build 6, run 10 October 2026) rates it **i3X 1.0 Compatible**: 50 passed,
-0 failed, 10 skipped. The skipped tests are the write tests; full compliance needs writes, and a server
+0 failed, 10 skipped ([report](docs/i3x-conformance-2026-10-10.json)). The skipped tests are the write tests; full compliance needs writes, and a server
 that republishes public data has nothing to write.
 
 The spec requires authentication on data endpoints, so there is a free public read-only token:
