@@ -19,10 +19,7 @@ const DAILY = [
 // Dominant wind from the northwest round to the northeast.
 const isNorthWind = (deg) => deg != null && (deg >= 300 || deg <= 60);
 
-export async function dailyWeather(f, place) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lng}`
-    + `&daily=${DAILY.join(',')}&past_days=92&forecast_days=7&timezone=auto`;
-  const data = await getJson(f, url);
+function parseDaily(data) {
   const d = data.daily || {};
   const days = (d.time || []).map((date, i) => ({
     date,
@@ -39,6 +36,26 @@ export async function dailyWeather(f, place) {
   return { days, timezone: data.timezone || 'UTC' };
 }
 
+const url = (ps) => `https://api.open-meteo.com/v1/forecast?latitude=${ps.map((p) => p.lat).join(',')}&longitude=${ps.map((p) => p.lng).join(',')}`
+  + `&daily=${DAILY.join(',')}&past_days=92&forecast_days=7&timezone=auto`;
+
+export async function dailyWeather(f, place) {
+  return parseDaily(await getJson(f, url([place])));
+}
+
+/**
+ * Many places in one request per 50: Open-Meteo takes comma-separated coordinates and answers with
+ * a list. One request per place ran into its per-minute limit on a layer of every hub.
+ */
+export async function dailyWeatherMany(f, places) {
+  const out = [];
+  for (let i = 0; i < places.length; i += 50) {
+    const data = await getJson(f, url(places.slice(i, i + 50)), {}, 30000);
+    out.push(...(Array.isArray(data) ? data : [data]).map(parseDaily));
+  }
+  return out;
+}
+
 export const openMeteo = {
   source: 'open-meteo',
   metrics: ['weather_daily'],
@@ -46,8 +63,9 @@ export const openMeteo = {
   async fetch({ fetch: f, now, places, src }) {
     const source = src('open-meteo');
     const out = [];
-    for (const p of places) {
-      const { days, timezone } = await dailyWeather(f, p);
+    const weather = await dailyWeatherMany(f, places);
+    for (const [k, p] of places.entries()) {
+      const { days, timezone } = weather[k];
       const today = localDate(now, timezone);
       days.forEach((day, i) => {
         const forecast = day.date >= today; // today is still incomplete
@@ -76,8 +94,9 @@ export const waterfowlWsi = {
   async fetch({ fetch: f, now, places, src }) {
     const source = src('waterfowl-wsi');
     const out = [];
-    for (const p of places) {
-      const { days, timezone } = await dailyWeather(f, p);
+    const weather = await dailyWeatherMany(f, places);
+    for (const [k, p] of places.entries()) {
+      const { days, timezone } = weather[k];
       const today = localDate(now, timezone);
       computeWsi(days).forEach((w) => {
         if (w.wsi == null) return;

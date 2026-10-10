@@ -53,6 +53,18 @@ test('open-meteo: snow m→cm, today onward is forecast, day-over-day pressure, 
   assert.equal(readings[0].place.id, 'maumee-bay');
 });
 
+test('open-meteo: many places go in one request and each gets its own answer from the list', async () => {
+  const other = { ...omDaily, daily: { ...omDaily.daily, temperature_2m_mean: omDaily.daily.temperature_2m_mean.map((t) => t + 10) } };
+  const f = stubFetch([[/api\.open-meteo\.com/, () => res(200, [omDaily, other])]]);
+  const { readings } = await openMeteo.fetch(ctx(f, { places: [MAUMEE, TOLEDO] }));
+  assert.equal(f.calls.length, 1);
+  assert.match(f.calls[0].url, new RegExp(`latitude=${MAUMEE.lat},${TOLEDO.lat}`));
+  assert.equal(readings.length, 6);
+  valid(readings);
+  const first = (id) => readings.find((r) => r.place.id === id).value;
+  assert.equal(first(TOLEDO.id) - first(MAUMEE.id), 10);
+});
+
 test('waterfowl-wsi: one reading per day, value from the paper formula', async () => {
   const f = stubFetch([[/api\.open-meteo\.com/, () => res(200, omDaily)]]);
   const { readings } = await waterfowlWsi.fetch(ctx(f, { places: [MAUMEE] }));
