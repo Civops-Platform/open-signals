@@ -209,7 +209,7 @@ export const LAYERS = {
     extra: (r) => ({ flood_category: r.fields.flood_category, flood_rank: r.fields.flood_rank, forecast_category: r.fields.forecast_category }),
     read: 'One point per gauge in bbox (default the Great Lakes basin). flood_rank 0 none, 1 action, 2 minor, 3 moderate, 4 major.' },
   epa_facilities: { label: 'Major EPA-regulated facilities', source: 'epa-echo', metric: 'facility_compliance', unit: 'quarters with non-compliance (of 12)', value: valueOf, events: true,
-    extra: (r) => ({ compliance_status: r.fields.compliance_status, significant_noncomplier: r.fields.significant_noncomplier, naics: r.fields.naics }),
+    extra: (r) => ({ compliance_status: r.fields.compliance_status, significant_noncomplier: r.fields.significant_noncomplier, naics: r.fields.naics, last_inspection: r.fields.last_inspection }),
     read: 'Major air, water and hazardous-waste permit holders in one state (state=XX, default OH). What EPA has recorded, not a finding about the facility today.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },

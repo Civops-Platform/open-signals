@@ -265,7 +265,7 @@ test('epa-echo: query id then GeoJSON; state is a closed set; significant non-co
   assert.equal(readings[0].value, 4);
   assert.equal(readings[0].fields.significant_noncomplier, true);
   assert.equal(readings[0].fields.last_inspection, '2025-11-06');
-  assert.match(readings[0].summary, /significant non-complier, penalties \$12,000/);
+  assert.match(readings[0].summary, /significant non-complier, penalties \$12,000 \(5 yr\); last inspected 2025-11-06/);
   const bad = stubFetch([[/get_facilities/, () => res(200, { Results: { Error: { ErrorMessage: 'too many' } } })]]);
   await assert.rejects(epaEcho.fetch(ctx(bad)), /no query id/);
 });

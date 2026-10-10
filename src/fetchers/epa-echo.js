@@ -45,7 +45,8 @@ export const epaEcho = {
         place: { id: `frs-${p.RegistryID}`, name: p.FacName, lat, lng, state: p.FacState },
         value: qtrs, unit: 'quarters with non-compliance (of last 12)',
         summary: `${p.FacName}, ${p.FacCity || ''} ${p.FacState || ''}: ${p.FacComplianceStatus || 'status not reported'}`
-          + `${snc ? ', significant non-complier' : ''}${p.FacTotalPenalties && p.FacTotalPenalties !== '$0' ? `, penalties ${p.FacTotalPenalties} (5 yr)` : ''}`,
+          + `${snc ? ', significant non-complier' : ''}${p.FacTotalPenalties && p.FacTotalPenalties !== '$0' ? `, penalties ${p.FacTotalPenalties} (5 yr)` : ''}`
+          + `${p.FacDateLastInspection ? `; last inspected ${String(p.FacDateLastInspection).slice(0, 10)}` : ''}`,
         fields: {
           registry_id: p.RegistryID, compliance_status: p.FacComplianceStatus ?? null, significant_noncomplier: snc,
           caa_status: p.CAAComplianceStatus ?? null, cwa_status: p.CWAComplianceStatus ?? null, rcra_status: p.RCRAComplianceStatus ?? null,
