@@ -21,7 +21,7 @@ const MAX_ADHOC_PLACES = 10;
 const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
-  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360,
+  'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -215,6 +215,8 @@ export const LAYERS = {
     extra: (r) => ({ kind: r.fields.kind, classification: r.fields.classification, firm: r.fields.recalling_firm }), read: 'At the recalling firm’s ZIP (its centre, not the building). Class I is the most serious.' },
   contract_awards: { label: 'New federal contract awards', source: 'usaspending', metric: 'contract_award', unit: 'USD', value: valueOf, events: true,
     extra: (r) => ({ recipient: r.fields.recipient, agency: r.fields.agency }), read: 'The 100 largest new contracts of the last 30 days, at the place-of-performance ZIP.' },
+  wildlife: { label: 'Wildlife and plant observations (GBIF)', source: 'gbif', metric: 'observation', unit: 'individuals', value: valueOf, events: true,
+    extra: (r) => ({ species: r.fields.species, class: r.fields.class, kingdom: r.fields.kingdom }), read: 'The last two weeks, open-licensed records identified to species, inside bbox (default the lower 48); group= picks birds, mammals, plants and so on.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
 };

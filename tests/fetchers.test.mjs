@@ -323,3 +323,22 @@ test('a 429 is retried once after Retry-After; a second 429 throws', async () =>
   const always = async () => ({ ...res(429, 'no'), headers: { get: () => '0' } });
   await assert.rejects(getJson(always, 'https://x.test/b'), /429/);
 });
+
+import { gbif } from '../src/fetchers/gbif.js';
+test('gbif: open licences only, species-level only, no observer names; group and bbox are checked', async () => {
+  const f = stubFetch([[/occurrence\/search/, () => res(200, { results: [
+    { key: 1, species: 'Ardea herodias', vernacularName: 'Great Blue Heron', class: 'Aves', kingdom: 'Animalia', eventDate: '2026-10-08T07:00', decimalLatitude: 41.6, decimalLongitude: -83.2, stateProvince: 'Ohio', individualCount: 2, license: 'http://creativecommons.org/publicdomain/zero/1.0/legalcode', recordedBy: 'Somebody', datasetKey: 'd' },
+    { key: 2, species: null, eventDate: '2026-10-08', decimalLatitude: 1, decimalLongitude: 1 },
+  ] })]]);
+  const { readings } = await gbif.fetch(ctx(f, { params: { group: 'birds' } }));
+  assert.match(f.calls[0].url, /license=CC0_1_0&license=CC_BY_4_0/);
+  assert.match(f.calls[0].url, /classKey=212/);
+  valid(readings);
+  assert.equal(readings.length, 1, 'records not identified to species are dropped');
+  assert.equal(readings[0].at, '2026-10-08');
+  assert.ok(!JSON.stringify(readings[0]).includes('Somebody'), 'no observer names');
+  await assert.rejects(gbif.fetch(ctx(f, { params: { bbox: '1,2' } })), (e) => e.status === 400);
+  const g = stubFetch([[/occurrence/, () => res(200, { results: [] })]]);
+  await gbif.fetch(ctx(g, { params: { group: 'dragons' } }));
+  assert.ok(!/classKey|kingdomKey/.test(g.calls[0].url), 'an unknown group means all');
+});
