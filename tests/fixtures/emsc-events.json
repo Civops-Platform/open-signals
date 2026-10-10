@@ -1,0 +1,89 @@
+{
+ "type": "FeatureCollection",
+ "metadata": {
+  "count": 3
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     71.484,
+     36.74,
+     -181.0
+    ]
+   },
+   "id": "20261010_0000407",
+   "properties": {
+    "source_id": "2072657",
+    "source_catalog": "EMSC-RTS",
+    "lastupdate": "2026-10-10T23:28:54.926358Z",
+    "time": "2026-10-10T23:11:03.0Z",
+    "flynn_region": "HINDU KUSH REGION, AFGHANISTAN",
+    "lat": 36.74,
+    "lon": 71.484,
+    "depth": 181.0,
+    "evtype": "ke",
+    "auth": "NDI",
+    "mag": 4.2,
+    "magtype": "m",
+    "unid": "20261010_0000407"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -81.4756,
+     7.7103,
+     -5.0
+    ]
+   },
+   "id": "20261010_0000409",
+   "properties": {
+    "source_id": "2072660",
+    "source_catalog": "EMSC-RTS",
+    "lastupdate": "2026-10-10T23:15:27.939549Z",
+    "time": "2026-10-10T23:06:58.0Z",
+    "flynn_region": "PANAMA",
+    "lat": 7.7103,
+    "lon": -81.4756,
+    "depth": 5.0,
+    "evtype": "ke",
+    "auth": "IGC",
+    "mag": 4.8,
+    "magtype": "m",
+    "unid": "20261010_0000409"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -81.3661,
+     7.7003,
+     -5.0
+    ]
+   },
+   "id": "20261010_0000394",
+   "properties": {
+    "source_id": "2072644",
+    "source_catalog": "EMSC-RTS",
+    "lastupdate": "2026-10-10T22:43:39.50015Z",
+    "time": "2026-10-10T22:35:54.0Z",
+    "flynn_region": "PANAMA",
+    "lat": 7.7003,
+    "lon": -81.3661,
+    "depth": 5.0,
+    "evtype": "ke",
+    "auth": "IGC",
+    "mag": 4.0,
+    "magtype": "m",
+    "unid": "20261010_0000394"
+   }
+  }
+ ]
+}

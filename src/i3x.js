@@ -42,6 +42,11 @@ export const I3X_LAYERS = {
   contract_awards: {},
   wildlife: {},
   world_bank: { q: { indicator: 'gdp_growth' } },
+  earthquakes_emsc: { q: { window: 'day' } },
+  tropical_cyclones: {},
+  power_plants: { q: { min_mw: 2000 } },
+  eu_industrial_production: { q: { indicator: 'industrial_production' } },
+  fema_declarations: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');

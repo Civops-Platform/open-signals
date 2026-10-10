@@ -22,6 +22,7 @@ const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
   'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
+  emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, 'wri-gppd': 1440, openfema: 60,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -221,6 +222,21 @@ export const LAYERS = {
     extra: (r) => ({ category: r.fields.category, category_title: r.fields.category_title }), read: 'Open storms, wildfires, volcanoes, floods, ice and dust events; the latest position of each.' },
   world_bank: { label: 'World Bank indicators by country', source: 'world-bank', metric: null, unit: 'varies', value: valueOf, events: true,
     extra: (r) => ({ indicator: r.fields.label, year: r.fields.year, region: r.fields.region }), read: 'Latest annual value per economy, at its capital; indicator= picks gdp_growth, inflation, manufacturing, exports, fdi or unemployment.' },
+  earthquakes_emsc: { label: 'Earthquakes (EMSC, Europe-weighted)', source: 'emsc', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
+    extra: (r) => ({ depth_km: r.fields.depth_km, region: r.fields.region, agency: r.fields.agency }),
+    read: 'EMSC-CSEM events at their epicentre, densest over Europe and the Mediterranean; window= hour|day|week, min= all|2.5|4.5. Overlaps the USGS earthquakes layer elsewhere; kept separate so each point has one source.' },
+  tropical_cyclones: { label: 'Tropical cyclones worldwide (IBTrACS)', source: 'noaa-ibtracs', metric: 'tropical_cyclone', unit: 'kt', value: valueOf, events: true,
+    extra: (r) => ({ basin: r.fields.basin, category: r.fields.category, pressure_hpa: r.fields.pressure_hpa }),
+    read: 'The latest best-track fix of every storm in the IBTrACS ACTIVE file, any basin, fixes within 7 days of the newest. Provisional tracks; NCEI refreshes the file every few days, so a fix can be a day or more old.' },
+  power_plants: { label: 'Power plants (WRI Global Power Plant Database)', source: 'wri-gppd', metric: 'power_plant', unit: 'MW', value: valueOf, events: true,
+    extra: (r) => ({ fuel: r.fields.fuel, country: r.fields.country, commissioning_year: r.fields.commissioning_year, owner: r.fields.owner }),
+    read: 'Static database as of June 2021 (v1.3.0), plants of 50 MW or more. Default: 1000 MW or more worldwide; country=DEU gives every plant there of 50 MW or more; fuel= and min_mw= narrow it.' },
+  eu_industrial_production: { label: 'Industrial production by country (Eurostat)', source: 'eurostat', metric: null, unit: 'varies', value: valueOf, events: true,
+    extra: (r) => ({ indicator: r.fields.label, month: r.fields.month, status: r.fields.status }),
+    read: 'Latest month per country (EU, EFTA and candidates), at its capital. indicator=industrial_production is an index (2021 = 100); industrial_production_yoy is % on the same month a year earlier.' },
+  fema_declarations: { label: 'FEMA disaster declarations (last 90 days)', source: 'openfema', metric: 'disaster_declaration', unit: 'declaration type', value: valueOf, events: true,
+    extra: (r) => ({ declaration: r.fields.declaration, incident_type: r.fields.incident_type, declaration_type: r.fields.declaration_type, placed_at: r.fields.placed_at }),
+    read: 'One point per declared county (its Census internal point), or a state point for statewide and tribal declarations. Value 3 major disaster, 2 emergency, 1 fire management. Uses the OpenFEMA API; not endorsed by FEMA.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
 };
