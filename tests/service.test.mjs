@@ -231,3 +231,11 @@ test('datasets over HTTP and MCP', async () => {
     assert.match(JSON.parse(call.result.content[0].text).url, /\/v1\/datasets\/fire\/OH$/);
   } finally { srv.close(); }
 });
+
+test('zip lookup: a US ZIP answers its ZCTA centre; anything else is 404', async () => {
+  await withServer({}, [], async (base) => {
+    const r = await (await fetch(`${base}/v1/zip/44101`)).json();
+    assert.ok(r.lat > 41 && r.lat < 42 && r.lng < -81 && r.lng > -82.5, JSON.stringify(r));
+    assert.equal((await fetch(`${base}/v1/zip/K1A0B1`)).status, 404);
+  });
+});

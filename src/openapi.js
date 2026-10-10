@@ -76,6 +76,7 @@ export const openapi = {
         responses: { 200: { description: 'GeoJSON FeatureCollection', content: { 'application/geo+json': { schema: { type: 'object' } } } }, ...errors },
       },
     },
+    '/v1/zip/{zip}': { get: { summary: 'Centre of a US ZIP code area (Census ZCTA)', parameters: [{ name: 'zip', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: json({ type: 'object' }), 404: errors[404] } } },
     '/v1/datasets': { get: { summary: 'Static public datasets', responses: { 200: json({ type: 'object' }) } } },
     '/v1/datasets/{id}': { get: { summary: 'One dataset described', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: json({ type: 'object' }), 404: errors[404] } } },
     '/v1/datasets/{id}/{part}': { get: { summary: 'One part of a dataset as GeoJSON (a state, or all)', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'part', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'GeoJSON FeatureCollection', content: { 'application/geo+json': { schema: { type: 'object' } } } }, 404: errors[404], 451: errors[451] } } },

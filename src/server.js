@@ -18,6 +18,7 @@ import { HttpError } from './errors.js';
 import { handleRpc, MCP_DESCRIPTION } from './mcp.js';
 import { openapi } from './openapi.js';
 import { createDatasets } from './datasets.js';
+import { zipCentroid } from './fetchers/zip.js';
 
 const MAX_BODY = 1_000_000;
 
@@ -86,6 +87,11 @@ export function createServer({ service = createService(), env = process.env, log
       return s ? send(res, 200, { ...s, servable_here: service.fetchableIds('serve').includes(s.id) }) : send(res, 404, { error: 'unknown source' });
     }
     if (p === '/v1/hubs') return send(res, 200, { hubs: HUBS });
+    if (p.startsWith('/v1/zip/')) {
+      const z = decodeURIComponent(p.slice(8));
+      const c = zipCentroid(z);
+      return c ? send(res, 200, { zip: z.slice(0, 5), lng: c[0], lat: c[1], source: 'US Census Bureau ZCTA gazetteer (centre of the ZIP area)' }) : send(res, 404, { error: 'unknown US ZIP code' });
+    }
     if (p === '/v1/places') {
       const ps = q.tag ? PLACES.filter((x) => x.tags?.includes(q.tag)) : PLACES;
       return send(res, 200, { type: 'FeatureCollection', features: ps.map((x) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [x.lng, x.lat] }, properties: { id: x.id, name: x.name, kind: x.kind, state: x.state, tags: x.tags, refs: x.refs } })) });
