@@ -68,7 +68,32 @@ const READING_SCHEMA = (unit) => ({
   required: ['value', 'summary', 'observedAt', 'source'],
 });
 
-export function createI3x({ service, env = process.env, now = () => Date.now() } = {}) {
+/**
+ * folders(): Promise<[{ id, label, description, read?, unit?, license?, sourceName?, readings: [reading] }]>
+ *   is the whole address space below the root, one folder per series; open-signals passes its
+ *   published layers (openSignalsFolders below), and any other server can pass its own (Genome does).
+ * ns: { uri, displayName }, serverName, serverVersion, rootName, rootDescription, prefix (elementId prefix).
+ */
+/** open-signals' published layers as i3X folders (the licence gate applies). */
+export async function openSignalsFolders(service, env = process.env) {
+  const out = [];
+  for (const [id, cfg] of Object.entries(I3X_LAYERS)) {
+    const L = LAYERS[id];
+    if (!L) continue;
+    const src = catalogSource(L.source);
+    if (!servable(src.license, env)) continue;
+    let r;
+    try { r = await service.readings(L.source, { ...(cfg.q || {}), limit: 1000 }, { mode: 'serve' }); } catch { continue; }
+    out.push({ id, label: L.label, read: L.read, unit: L.unit, license: src.license, sourceName: src.name, description: `${src.name} (${src.license})`,
+      readings: r.readings.filter((x) => !L.metric || x.metric === L.metric) });
+  }
+  return out;
+}
+
+export function createI3x({ service, folders, ns = NS, serverName = 'open-signals', serverVersion = '0.1.0', prefix = 'os',
+  rootName = 'open-signals', rootDescription = 'Public data signals with provenance and licence on every reading', authHint = 'The public read-only token is published in the open-signals README.',
+  env = process.env, now = () => Date.now() } = {}) {
+  const loadFolders = folders || (() => openSignalsFolders(service, env));
   const boot = utc(now());
   let space = null, builtAt = 0, building = null;
   const subs = new Map();
@@ -85,62 +110,56 @@ export function createI3x({ service, env = process.env, now = () => Date.now() }
   }
 
   async function build() {
+    const P = prefix;
     const types = [
-      { elementId: 'os:type:folder', displayName: 'Folder', namespaceUri: NS.uri, sourceTypeId: 'Folder', version: '1.0.0',
+      { elementId: `${P}:type:folder`, displayName: 'Folder', namespaceUri: ns.uri, sourceTypeId: 'Folder', version: '1.0.0',
         schema: { type: 'object', description: 'A folder. It has no value of its own.', properties: {} } },
     ];
     const rels = [['HasParent', 'HasChildren'], ['HasChildren', 'HasParent']]
       .map(([id, rev]) => ({ elementId: id, displayName: id, namespaceUri: I3X_NS.uri, relationshipId: id, reverseOf: rev }));
     const objects = [], values = new Map(), history = new Map(), edges = new Map();
     const edge = (a, rel, b) => { let m = edges.get(a); if (!m) edges.set(a, m = {}); (m[rel] ??= []).push(b); };
-    objects.push({ elementId: 'os:root', displayName: 'open-signals', typeElementId: 'os:type:folder', parentId: null, isComposition: false, isExtended: false,
-      description: 'Public data signals with provenance and licence on every reading' });
-    values.set('os:root', { value: null, quality: 'GoodNoData', timestamp: boot });
+    const root = `${P}:root`;
+    objects.push({ elementId: root, displayName: rootName, typeElementId: `${P}:type:folder`, parentId: null, isComposition: false, isExtended: false, description: rootDescription });
+    values.set(root, { value: null, quality: 'GoodNoData', timestamp: boot });
 
-    for (const [id, cfg] of Object.entries(I3X_LAYERS)) {
-      const L = LAYERS[id];
-      if (!L) continue;
-      const src = catalogSource(L.source);
-      if (!servable(src.license, env)) continue;
-      let r;
-      try { r = await service.readings(L.source, { ...(cfg.q || {}), limit: 1000 }, { mode: 'serve' }); } catch { continue; }
-      const typeId = `os:type:${id}`;
-      types.push({ elementId: typeId, displayName: L.label, namespaceUri: NS.uri, sourceTypeId: id, version: '1.0.0',
-        schema: { ...READING_SCHEMA(L.unit), description: `${L.label}. ${L.read || ''} Source: ${src.name}, licence ${src.license}.`.trim() } });
-      const folder = `os:folder:${id}`;
-      objects.push({ elementId: folder, displayName: L.label, typeElementId: 'os:type:folder', parentId: 'os:root', isComposition: false, isExtended: false,
-        description: `${src.name} (${src.license})` });
+    for (const f of await loadFolders()) {
+      const typeId = `${P}:type:${f.id}`;
+      types.push({ elementId: typeId, displayName: f.label, namespaceUri: ns.uri, sourceTypeId: f.id, version: '1.0.0',
+        schema: { ...READING_SCHEMA(f.unit), description: `${f.label}. ${f.read || ''} Source: ${f.sourceName || ''}${f.license ? `, licence ${f.license}` : ''}.`.replace(/\s+/g, ' ').trim() } });
+      const folder = `${P}:folder:${f.id}`;
+      objects.push({ elementId: folder, displayName: f.label, typeElementId: `${P}:type:folder`, parentId: root, isComposition: false, isExtended: false,
+        description: f.description || f.label });
       values.set(folder, { value: null, quality: 'GoodNoData', timestamp: boot });
-      edge('os:root', 'HasChildren', folder); edge(folder, 'HasParent', 'os:root');
+      edge(root, 'HasChildren', folder); edge(folder, 'HasParent', root);
       const byPlace = new Map();
-      for (const x of r.readings) {
-        if (L.metric && x.metric !== L.metric) continue;
+      for (const x of f.readings) {
         const pid = x.place?.id || x.id;
         (byPlace.get(pid) || byPlace.set(pid, []).get(pid)).push(x);
       }
       for (const [pid, rs] of byPlace) {
-        const oid = `os:${id}:${slug(pid)}`;
+        const oid = `${P}:${f.id}:${slug(pid)}`;
         if (values.has(oid)) continue;
         const vqts = rs.map((x) => {
           const ts = stamp(x.at);
           // The VQT value is the whole reading, which is always present, so quality is Good even when the
           // reading's own number is null (QRY-02: GoodNoData would claim the value itself is null).
           return ts && { quality: 'Good', timestamp: ts, forecast: !!x.forecast,
-            value: { value: x.value, unit: x.unit, summary: x.summary, observedAt: ts, ...(x.forecast ? { forecast: true } : {}), place: x.place,
-              source: { id: x.source.id, name: x.source.name, url: x.source.url, fetchedAt: x.source.fetched_at, license: x.source.license }, fields: x.fields } };
+            value: { value: x.value ?? null, unit: x.unit ?? null, summary: x.summary, observedAt: ts, ...(x.forecast ? { forecast: true } : {}), place: x.place ?? null,
+              source: { id: x.source.id, name: x.source.name, url: x.source.url ?? null, fetchedAt: x.source.fetched_at, license: x.source.license }, fields: x.fields ?? {} } };
         }).filter(Boolean).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
         if (!vqts.length) continue;
         const observed = vqts.filter((v) => !v.forecast);
-        const cur = (observed.length ? observed : vqts)[(observed.length ? observed : vqts).length - 1];
+        const pool = observed.length ? observed : vqts;
         const strip = ({ forecast, ...v }) => v;
         objects.push({ elementId: oid, displayName: String(rs[0].place?.name || rs[0].summary).slice(0, 160), typeElementId: typeId, parentId: folder,
-          isComposition: false, isExtended: false, description: rs[0].summary.slice(0, 240) });
-        values.set(oid, strip(cur));
+          isComposition: false, isExtended: false, description: String(rs[0].summary).slice(0, 240) });
+        values.set(oid, strip(pool[pool.length - 1]));
         history.set(oid, observed.map(strip));
         edge(folder, 'HasChildren', oid); edge(oid, 'HasParent', folder);
       }
     }
-    return { namespaces: [NS, I3X_NS], types, typesById: new Map(types.map((t) => [t.elementId, t])), rels, relsById: new Map(rels.map((x) => [x.elementId, x])),
+    return { namespaces: [ns, I3X_NS], types, typesById: new Map(types.map((t) => [t.elementId, t])), rels, relsById: new Map(rels.map((x) => [x.elementId, x])),
       objects, byId: new Map(objects.map((o) => [o.elementId, o])), values, history, edges };
   }
 
@@ -155,7 +174,7 @@ export function createI3x({ service, env = process.env, now = () => Date.now() }
     const base = { elementId: o.elementId, displayName: o.displayName, typeElementId: o.typeElementId, parentId: o.parentId, isComposition: o.isComposition, isExtended: o.isExtended };
     if (meta) {
       const t = a.typesById.get(o.typeElementId);
-      base.metadata = { description: o.description ?? null, typeNamespaceUri: t ? t.namespaceUri : NS.uri, sourceTypeId: t ? t.sourceTypeId : 'Folder', relationships: a.edges.get(o.elementId) ?? {} };
+      base.metadata = { description: o.description ?? null, typeNamespaceUri: t ? t.namespaceUri : ns.uri, sourceTypeId: t ? t.sourceTypeId : 'Folder', relationships: a.edges.get(o.elementId) ?? {} };
     }
     return base;
   };
@@ -201,7 +220,7 @@ export function createI3x({ service, env = process.env, now = () => Date.now() }
     const key = `${method} ${path}`;
     switch (key) {
       case 'GET /info':
-        return R(200, { success: true, result: { specVersion: I3X_SPEC_VERSION, serverVersion: '0.1.0', serverName: 'open-signals',
+        return R(200, { success: true, result: { specVersion: I3X_SPEC_VERSION, serverVersion, serverName,
           capabilities: { query: { history: true }, update: { current: false, history: false }, subscribe: { stream: true } } } });
       case 'GET /namespaces': return R(200, { success: true, result: (await as()).namespaces });
       case 'GET /objecttypes': { const ns = url.searchParams.get('namespaceUri'); return R(200, { success: true, result: (await as()).types.filter((t) => !ns || t.namespaceUri === ns) }); }
@@ -350,11 +369,11 @@ export function createI3x({ service, env = process.env, now = () => Date.now() }
       const h = req.headers.authorization || '';
       const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
       const p = tok ? table.get(tok) : null;
-      if (!p) { send(res, 401, problem(401, 'Unauthorized', 'A bearer token is required. The public read-only token is published in the open-signals README.'), gz, { 'WWW-Authenticate': 'Bearer realm="i3x"' }); return true; }
+      if (!p) { send(res, 401, problem(401, 'Unauthorized', 'A bearer token is required. ' + authHint), gz, { 'WWW-Authenticate': 'Bearer realm="i3x"' }); return true; }
       if (p.expires && (Number.isNaN(Date.parse(p.expires)) || now() >= Date.parse(p.expires))) { send(res, 401, problem(401, 'Unauthorized', 'This credential has expired.'), gz, { 'WWW-Authenticate': 'Bearer realm="i3x", error="invalid_token"' }); return true; }
       const rl = rateOk(tok);
       if (!rl.ok) { send(res, 429, problem(429, 'Too Many Requests', 'This credential is over its request budget.'), gz, { 'Retry-After': String(rl.retry) }); return true; }
-      if (method === 'PUT' && (path === '/objects/value' || path === '/objects/history')) { send(res, 501, problem(501, 'Not Implemented', 'open-signals republishes public data; nothing on this server is writable, and update capabilities are false in GET /info.'), gz); return true; }
+      if (method === 'PUT' && (path === '/objects/value' || path === '/objects/history')) { send(res, 501, problem(501, 'Not Implemented', 'Nothing on this server is writable; update capabilities are false in GET /info.'), gz); return true; }
       principal = p;
     }
     let body = null;
