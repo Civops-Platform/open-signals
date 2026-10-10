@@ -295,3 +295,15 @@ test('i3X: a reading with a null number is still a present value, quality Good (
     assert.equal(v.results[0].result.value.value, null);
   } finally { srv.close(); }
 });
+
+test('i3X engine: a reading with no place conforms to its type (place may be null, QRY-03)', async () => {
+  const { createI3x } = await import('../src/i3x.js');
+  const i3x = createI3x({ env: { I3X_TOKENS: '{"t":{}}' }, prefix: 'x', folders: async () => [{ id: 'idx', label: 'Index', readings: [
+    { id: 'a', at: '2026-10-01', value: 3, unit: 'pts', summary: 'An index', place: null, fields: {}, source: { id: 's', name: 'S', url: null, fetched_at: '2026-10-10T00:00:00Z', license: 'public_domain' } }] }] });
+  const space = await i3x.addressSpace();
+  const t = space.typesById.get('x:type:idx');
+  const v = space.values.get('x:idx:x-idx-a') || [...space.values.values()].find((x) => x.value && x.value.summary === 'An index');
+  assert.ok(v, 'object exists');
+  assert.deepEqual(t.schema.properties.place.type, ['object', 'null']);
+  assert.equal(v.value.place, null);
+});

@@ -61,7 +61,7 @@ const READING_SCHEMA = (unit) => ({
     summary: { type: 'string' },
     observedAt: { type: 'string', description: 'When the source observed it (RFC 3339)' },
     forecast: { type: 'boolean' },
-    place: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' } } },
+    place: { type: ['object', 'null'], description: 'Where it was observed; null for a series with no place (a national index, a company)', properties: { id: { type: 'string' }, name: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' } } },
     source: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, url: { type: ['string', 'null'] }, fetchedAt: { type: 'string' }, license: { type: 'string' } } },
     fields: { type: 'object', description: 'Everything else the upstream said' },
   },
