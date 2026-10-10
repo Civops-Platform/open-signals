@@ -24,7 +24,7 @@ import { createI3x } from './i3x.js';
 
 const MAX_BODY = 1_000_000;
 
-export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }), i3x = createI3x({ service, env }) } = {}) {
+export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }), i3x = createI3x({ service, env, warm: !!env.I3X_TOKENS }) } = {}) {
   const limit = Number(env.RATE_LIMIT_PER_MIN || 60);
   const hits = new Map();
 

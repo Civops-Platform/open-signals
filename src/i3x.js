@@ -92,7 +92,7 @@ export async function openSignalsFolders(service, env = process.env) {
 
 export function createI3x({ service, folders, ns = NS, serverName = 'open-signals', serverVersion = '0.1.0', prefix = 'os',
   rootName = 'open-signals', rootDescription = 'Public data signals with provenance and licence on every reading', authHint = 'The public read-only token is published in the open-signals README.',
-  env = process.env, now = () => Date.now() } = {}) {
+  env = process.env, now = () => Date.now(), warm = false } = {}) {
   const loadFolders = folders || (() => openSignalsFolders(service, env));
   const boot = utc(now());
   let space = null, builtAt = 0, building = null;
@@ -222,7 +222,7 @@ export function createI3x({ service, folders, ns = NS, serverName = 'open-signal
       case 'GET /info':
         return R(200, { success: true, result: { specVersion: I3X_SPEC_VERSION, serverVersion, serverName,
           capabilities: { query: { history: true }, update: { current: false, history: false }, subscribe: { stream: true } } } });
-      case 'GET /namespaces': return R(200, { success: true, result: (await as()).namespaces });
+      case 'GET /namespaces': return R(200, { success: true, result: [ns, I3X_NS] }); // fixed; never waits on a build
       case 'GET /objecttypes': { const ns = url.searchParams.get('namespaceUri'); return R(200, { success: true, result: (await as()).types.filter((t) => !ns || t.namespaceUri === ns) }); }
       case 'GET /relationshiptypes': { const ns = url.searchParams.get('namespaceUri'); return R(200, { success: true, result: (await as()).rels.filter((t) => !ns || t.namespaceUri === ns) }); }
       case 'GET /objects': {
@@ -408,5 +408,8 @@ export function createI3x({ service, folders, ns = NS, serverName = 'open-signal
     s.stream = handleStream; tick();
   }
 
+  // Build the address space now rather than on the first request: a cold build of a large space
+  // (thousands of objects) ran past a client's timeout (CESMII EXP-01 on the Genome endpoint).
+  if (warm) as().catch(() => {});
   return { handle, addressSpace: as };
 }
