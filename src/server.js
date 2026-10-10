@@ -8,6 +8,7 @@
  *   RATE_LIMIT_PER_MIN         per client IP, default 60
  *   TRUST_PROXY                1 = take the client IP from X-Forwarded-For
  *   NASS_API_KEY, EBIRD_API_KEY  upstream keys, if you want those sources
+ *   OPEN_SIGNALS_DATA_DIR      folder with index.json of static datasets (optional; see src/datasets.js)
  */
 
 import http from 'node:http';
@@ -16,10 +17,11 @@ import { createService } from './service.js';
 import { HttpError } from './errors.js';
 import { handleRpc, MCP_DESCRIPTION } from './mcp.js';
 import { openapi } from './openapi.js';
+import { createDatasets } from './datasets.js';
 
 const MAX_BODY = 1_000_000;
 
-export function createServer({ service = createService(), env = process.env, log = console } = {}) {
+export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }) } = {}) {
   const limit = Number(env.RATE_LIMIT_PER_MIN || 60);
   const hits = new Map();
 
@@ -54,10 +56,10 @@ export function createServer({ service = createService(), env = process.env, log
       let msg;
       try { msg = JSON.parse(await readBody(req)); } catch { return send(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); }
       if (Array.isArray(msg)) {
-        const out = (await Promise.all(msg.map((m) => handleRpc(service, m)))).filter(Boolean);
+        const out = (await Promise.all(msg.map((m) => handleRpc(service, m, datasets)))).filter(Boolean);
         return out.length ? send(res, 200, out, { 'Cache-Control': 'no-store' }) : (res.writeHead(202), res.end());
       }
-      const out = await handleRpc(service, msg);
+      const out = await handleRpc(service, msg, datasets);
       return out ? send(res, 200, out, { 'Cache-Control': 'no-store' }) : (res.writeHead(202), res.end());
     }
 
@@ -67,8 +69,8 @@ export function createServer({ service = createService(), env = process.env, log
       return send(res, 200, {
         name: 'open-signals',
         about: 'Public data signals with provenance and licence on every reading, as REST, MCP and GeoJSON.',
-        catalogue: { sources: SOURCES.length, fetchable: service.fetchableIds('serve').length, hubs: HUBS.length, places: PLACES.length },
-        endpoints: ['/v1/sources', '/v1/sources/{id}', '/v1/hubs', '/v1/places', '/v1/readings?source={id}', '/v1/layers', '/v1/layers/{id}', '/mcp', '/openapi.json', '/health'],
+        catalogue: { sources: SOURCES.length, fetchable: service.fetchableIds('serve').length, hubs: HUBS.length, places: PLACES.length, datasets: datasets.list().length },
+        endpoints: ['/v1/sources', '/v1/sources/{id}', '/v1/hubs', '/v1/places', '/v1/readings?source={id}', '/v1/layers', '/v1/layers/{id}', '/v1/datasets', '/v1/datasets/{id}/{part}', '/mcp', '/openapi.json', '/health'],
         repository: 'https://github.com/Civops-Platform/open-signals',
         terms: 'Provided as is, no warranty. Readings pass on upstream data as published; each carries its own licence. Not for navigation or safety decisions.',
       });
@@ -93,6 +95,14 @@ export function createServer({ service = createService(), env = process.env, log
       return send(res, 200, await service.readings(q.source, q, { mode: 'serve' }));
     }
     if (p === '/v1/layers') return send(res, 200, { layers: service.layerCatalog('serve') });
+    if (p === '/v1/datasets') return send(res, 200, { datasets: datasets.list() });
+    if (p.startsWith('/v1/datasets/')) {
+      const [id, part] = p.slice(13).split('/').map(decodeURIComponent);
+      if (!part) return send(res, 200, datasets.get(id));
+      const { file, size } = datasets.part(id, part);
+      res.writeHead(200, { 'Content-Type': 'application/geo+json; charset=utf-8', 'Content-Length': size, 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600' });
+      return datasets.stream(file).pipe(res);
+    }
     if (p.startsWith('/v1/layers/')) return send(res, 200, await service.layer(decodeURIComponent(p.slice(11)), q, { mode: 'serve' }), { 'Content-Type': 'application/geo+json; charset=utf-8' });
 
     return send(res, 404, { error: 'not found' });

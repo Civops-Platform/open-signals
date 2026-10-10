@@ -56,6 +56,8 @@ export const TOOLS = [
       limit: { type: 'number', description: '1-1000, default 100.' },
     }, required: ['source'] },
   },
+  { name: 'list_datasets', description: 'Static public datasets this server holds as GeoJSON (wildfire burn perimeters, public-land share by county, federal campgrounds, fire-weather stations), with source, licence, feature count and parts (one per state, or "all").', inputSchema: { type: 'object', properties: {} } },
+  { name: 'get_dataset_part', description: 'The URL of one part of a dataset as GeoJSON, plus its description. Fetch the URL for the features; parts can be several megabytes.', inputSchema: { type: 'object', properties: { id: { type: 'string' }, part: { type: 'string', description: 'Two-letter state, or "all" for single-part datasets.' } }, required: ['id', 'part'] } },
   { name: 'list_layers', description: 'Map layers this server can draw as GeoJSON, with unit, source, licence, whether it is available here, and how to read it.', inputSchema: { type: 'object', properties: {} } },
   {
     name: 'get_layer',
@@ -73,7 +75,9 @@ const RESOURCES = [
 
 const text = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
 
-async function callTool(svc, name, a = {}) {
+const PUBLIC_BASE = process.env.OPEN_SIGNALS_PUBLIC_URL || 'https://open-signals.civops.io';
+
+async function callTool(svc, name, a = {}, ds) {
   switch (name) {
     case 'search_sources': return text({ sources: searchSources(a) });
     case 'get_source': {
@@ -88,13 +92,19 @@ async function callTool(svc, name, a = {}) {
       return text(await svc.readings(a.source, a, { mode: 'serve' }));
     }
     case 'list_layers': return text({ layers: svc.layerCatalog('serve') });
+    case 'list_datasets': return text({ datasets: ds ? ds.list() : [] });
+    case 'get_dataset_part': {
+      if (!ds) throw new HttpError(404, 'no datasets on this server');
+      const meta = ds.get(a.id); const { size } = ds.part(a.id, a.part);
+      return text({ ...meta, part: a.part, bytes: size, url: `${PUBLIC_BASE}/v1/datasets/${encodeURIComponent(a.id)}/${encodeURIComponent(a.part)}` });
+    }
     case 'get_layer': return text(await svc.layer(a.id, a, { mode: 'serve' }));
     default: throw Object.assign(new Error(`unknown tool '${name}'`), { rpc: -32602 });
   }
 }
 
 /** Handle one JSON-RPC message; returns the response object, or null for a notification. */
-export async function handleRpc(svc, msg) {
+export async function handleRpc(svc, msg, ds) {
   const { id = null, method, params = {} } = msg || {};
   const ok = (result) => ({ jsonrpc: '2.0', id, result });
   const err = (code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
@@ -113,7 +123,7 @@ export async function handleRpc(svc, msg) {
       case 'tools/list': return ok({ tools: TOOLS });
       case 'tools/call':
         try {
-          return ok(await callTool(svc, params.name, params.arguments || {}));
+          return ok(await callTool(svc, params.name, params.arguments || {}, ds));
         } catch (e) {
           if (e.rpc) return err(e.rpc, e.message);
           // Tool failures are results the model can read, not protocol errors.

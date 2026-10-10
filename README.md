@@ -58,6 +58,15 @@ CLI prints each source's licence so you know what you may do with what you fetch
 | `GET /v1/layers` · `GET /v1/layers/{id}?date=` | map layers as GeoJSON |
 | `GET /openapi.json` | the full description |
 
+### Static datasets
+
+Data that changes slowly is served as GeoJSON files rather than fetched live: wildfire burn
+perimeters for the last 20 years (NIFC WFIGS and USFS MTBS, one file per state), public-land share
+by county (USGS PAD-US 4.1), federal campgrounds (RIDB) and fire-weather stations (RAWS), all public
+domain. `GET /v1/datasets` lists them with source, licence and parts; `GET /v1/datasets/{id}/{part}`
+returns one part (a two-letter state, or `all`). A deployment points `OPEN_SIGNALS_DATA_DIR` at a
+folder holding the files and an `index.json`; the format is described in `src/datasets.js`.
+
 ### MCP
 
 `POST /mcp` uses the streamable HTTP transport (JSON-RPC 2.0). It is stateless and needs no auth.
@@ -65,6 +74,7 @@ Every tool is read-only:
 
 - `search_sources`, `get_source`, `list_hubs`, `list_places`
 - `get_readings`, `list_layers`, `get_layer`
+- `list_datasets`, `get_dataset_part`
 
 To add it to a client:
 

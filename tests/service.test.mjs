@@ -182,3 +182,52 @@ test('a fetcher rejecting its own parameter is a 400, an upstream 400 is not', a
   await assert.rejects(svc.readings('noaa-nwps', { bbox: 'nonsense' }), (e) => e instanceof HttpError && e.status === 400);
   await assert.rejects(svc.readings('noaa-nwps', {}), (e) => !(e instanceof HttpError) && e.status === 400 && e.body === 'upstream says no');
 });
+
+// ── Static datasets ──
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createDatasets } from '../src/datasets.js';
+
+function dataDir() {
+  const dir = mkdtempSync(path.join(tmpdir(), 'os-data-'));
+  mkdirSync(path.join(dir, 'fire'), { recursive: true });
+  writeFileSync(path.join(dir, 'fire', 'OH.geojson'), JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-82, 40] }, properties: { name: 'x' } }] }));
+  writeFileSync(path.join(dir, 'secret.txt'), 'nope');
+  writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ datasets: [
+    { id: 'fire', label: 'Fire', kind: 'polygons', part_by: 'state', source: 'NIFC', license: 'public_domain', features: 1, parts: { OH: 'fire/OH.geojson', XX: '../../etc/passwd' } },
+    { id: 'nc', label: 'NC', kind: 'points', part_by: null, source: 'x', license: 'non_commercial', features: 1, parts: { all: 'fire/OH.geojson' } },
+  ] }));
+  return dir;
+}
+
+test('datasets: listed with licence, served by part, gated by licence, never outside the data dir', async () => {
+  const ds = createDatasets({ dir: dataDir(), env: {} });
+  assert.deepEqual(ds.list().map((d) => [d.id, d.available]), [['fire', true], ['nc', false]]);
+  assert.ok(ds.part('fire', 'oh').size > 10, 'state part, case-insensitive');
+  assert.throws(() => ds.part('fire', 'CA'), (e) => e.status === 404);
+  assert.throws(() => ds.part('fire', 'XX'), (e) => e.status === 404, 'a path escaping the data dir is refused');
+  assert.throws(() => ds.part('nc', 'all'), (e) => e.status === 451);
+  assert.throws(() => ds.get('nope'), (e) => e.status === 404);
+  assert.deepEqual(createDatasets({ dir: '/nonexistent', env: {} }).list(), []);
+});
+
+test('datasets over HTTP and MCP', async () => {
+  const env = {};
+  const service = createService({ fetch: stubFetch([]), env, now: () => NOW });
+  const srv = createServer({ service, env, log: { error() {} }, datasets: createDatasets({ dir: dataDir(), env }) }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const list = await (await fetch(`${base}/v1/datasets`)).json();
+    assert.equal(list.datasets.length, 2);
+    const part = await fetch(`${base}/v1/datasets/fire/OH`);
+    assert.equal(part.status, 200);
+    assert.match(part.headers.get('content-type'), /geo\+json/);
+    assert.equal((await part.json()).features.length, 1);
+    assert.equal((await fetch(`${base}/v1/datasets/nc/all`)).status, 451);
+    assert.equal((await fetch(`${base}/v1/datasets/fire/%2e%2e%2fsecret.txt`)).status, 404);
+    const call = await rpc(base, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_dataset_part', arguments: { id: 'fire', part: 'OH' } } });
+    assert.match(JSON.parse(call.result.content[0].text).url, /\/v1\/datasets\/fire\/OH$/);
+  } finally { srv.close(); }
+});
