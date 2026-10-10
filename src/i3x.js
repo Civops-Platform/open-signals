@@ -123,7 +123,9 @@ export function createI3x({ service, env = process.env, now = () => Date.now() }
         if (values.has(oid)) continue;
         const vqts = rs.map((x) => {
           const ts = stamp(x.at);
-          return ts && { quality: x.value == null ? 'GoodNoData' : 'Good', timestamp: ts, forecast: !!x.forecast,
+          // The VQT value is the whole reading, which is always present, so quality is Good even when the
+          // reading's own number is null (QRY-02: GoodNoData would claim the value itself is null).
+          return ts && { quality: 'Good', timestamp: ts, forecast: !!x.forecast,
             value: { value: x.value, unit: x.unit, summary: x.summary, observedAt: ts, ...(x.forecast ? { forecast: true } : {}), place: x.place,
               source: { id: x.source.id, name: x.source.name, url: x.source.url, fetchedAt: x.source.fetched_at, license: x.source.license }, fields: x.fields } };
         }).filter(Boolean).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));

@@ -281,3 +281,17 @@ test('i3X: /info open; data needs a token; address space, value, history, subscr
 test('i3X is off (404) without a token table', async () => {
   await withServer({}, [], async (base) => { assert.equal((await fetch(`${base}/i3x/v1/info`)).status, 404); });
 });
+
+test('i3X: a reading with a null number is still a present value, quality Good (QRY-02)', async () => {
+  const env = { I3X_TOKENS: JSON.stringify({ t1: { label: 'test' } }) };
+  const q = { features: [{ id: 'n1', geometry: { coordinates: [-120, 40, 1] }, properties: { mag: null, place: 'Somewhere', time: Date.parse('2026-10-10T14:00:00Z') } }] };
+  const service = createService({ fetch: stubFetch([[/earthquake/, () => res(200, q)], [/./, () => res(500, 'off')]]), env, now: () => NOW });
+  const srv = createServer({ service, env, log: { error() {} } }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  const base = `http://127.0.0.1:${srv.address().port}/i3x/v1`;
+  try {
+    const v = await fetch(`${base}/objects/value`, { method: 'POST', headers: { Authorization: 'Bearer t1', 'Content-Type': 'application/json' }, body: JSON.stringify({ elementIds: ['os:earthquakes:eq-n1'] }) }).then((r) => r.json());
+    assert.equal(v.results[0].result.quality, 'Good');
+    assert.equal(v.results[0].result.value.value, null);
+  } finally { srv.close(); }
+});
