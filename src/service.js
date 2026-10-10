@@ -1,0 +1,204 @@
+/**
+ * What REST, MCP and the CLI share: resolve places, run a fetcher behind a
+ * cache, apply the licence gate, and draw layers as GeoJSON.
+ *
+ * mode 'serve' republishes, so the licence gate applies (contract.servable).
+ * mode 'local' is a person fetching for themselves with their own keys, so it
+ * does not; the CLI prints the licence note instead.
+ */
+
+import { servable, placeRef } from './contract.js';
+import { PLACES, source as catalogSource } from './catalog.js';
+import { FETCHERS } from './fetchers/index.js';
+
+export class HttpError extends Error {
+  constructor(status, message, extra = {}) {
+    super(message);
+    this.status = status;
+    this.extra = extra;
+  }
+}
+
+const MAX_ADHOC_PLACES = 10;
+
+// Minutes a fetch result is reused. Upstreams are public services; be polite.
+const TTL_MIN = {
+  'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
+  glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
+};
+
+// Places a fetcher reads when the caller names none.
+const WATER_BODIES = new Set(['marsh', 'bay', 'lake']);
+const DEFAULT_PLACES = {
+  'open-meteo': (ps) => ps.filter((p) => WATER_BODIES.has(p.kind)),
+  'waterfowl-wsi': (ps) => ps.filter((p) => p.tags?.includes('waterfowl') && WATER_BODIES.has(p.kind)),
+  'noaa-coops': (ps) => ps.filter((p) => p.refs?.coops),
+  'usgs-water': (ps) => ps.filter((p) => p.refs?.usgs),
+  ebird: (ps) => ps.filter((p) => p.refs?.ebird),
+};
+
+/**
+ * Places for a request, from (in order) ad-hoc coordinates or upstream ids,
+ * named catalogue places, a tag, or the fetcher's default.
+ *   q: { place: 'a,b', tag, lat, lng, name, coops, usgs, ebird }
+ */
+export function resolvePlaces(sourceId, q = {}, places = PLACES) {
+  const adhoc = [];
+  if (q.lat != null || q.lng != null) {
+    const lat = Number(q.lat), lng = Number(q.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw new HttpError(400, 'lat and lng must both be numbers in range');
+    }
+    adhoc.push({ id: `pt-${lat.toFixed(3)}_${lng.toFixed(3)}`, name: q.name || `${lat.toFixed(3)}, ${lng.toFixed(3)}`, lat, lng, refs: {} });
+  }
+  for (const ref of ['coops', 'usgs', 'ebird']) {
+    for (const v of splitList(q[ref])) {
+      if (!/^[A-Za-z0-9-]{1,40}$/.test(v)) throw new HttpError(400, `${ref} id '${v}' is not valid`);
+      adhoc.push({ id: `${ref}-${v}`, name: q.name || '', lat: null, lng: null, refs: { [ref]: v } });
+    }
+  }
+  if (adhoc.length > MAX_ADHOC_PLACES) throw new HttpError(400, `at most ${MAX_ADHOC_PLACES} ad-hoc places per request`);
+  if (adhoc.length) return adhoc;
+
+  const named = splitList(q.place);
+  if (named.length) {
+    const byId = new Map(places.map((p) => [p.id, p]));
+    const unknown = named.filter((id) => !byId.has(id));
+    if (unknown.length) throw new HttpError(404, `unknown place: ${unknown.join(', ')}`, { places: [...byId.keys()] });
+    return named.map((id) => byId.get(id));
+  }
+  const pool = q.tag ? places.filter((p) => p.tags?.includes(q.tag)) : places;
+  return (DEFAULT_PLACES[sourceId] || ((ps) => ps))(pool);
+}
+
+const splitList = (v) => (v == null || v === '' ? [] : String(v).split(',').map((s) => s.trim()).filter(Boolean));
+
+export function createService({ fetch: fetchFn = globalThis.fetch, env = process.env, now = () => new Date(), fetchers = FETCHERS, places = PLACES } = {}) {
+  const cache = new Map();
+
+  function gate(id, mode) {
+    const s = safeSource(id);
+    if (!fetchers[id]) throw new HttpError(404, `source '${id}' is catalogued but has no fetcher yet`, { fetchable: fetchableIds() });
+    if (mode === 'serve' && !servable(s.license, env)) {
+      throw new HttpError(451, `source '${id}' is licensed '${s.license}' and this server does not republish it: ${s.license_note}`, { license: s.license });
+    }
+    return s;
+  }
+
+  function fetchableIds(mode = 'local') {
+    return Object.keys(fetchers).filter((id) => mode !== 'serve' || servable(safeSource(id).license, env));
+  }
+
+  /** Run one source for the resolved places; cached by source, places and params. */
+  async function run(id, q = {}, { mode = 'serve' } = {}) {
+    gate(id, mode);
+    const f = fetchers[id];
+    const ps = resolvePlaces(id, q, places);
+    const params = Object.fromEntries(Object.keys(f.params || {}).filter((k) => q[k] != null).map((k) => [k, String(q[k])]));
+    const key = JSON.stringify([id, ps.map((p) => p.id).sort(), params]);
+    const hit = cache.get(key);
+    const t = now();
+    if (hit && hit.until > t.getTime()) return hit.result;
+    const result = await f.fetch({ fetch: fetchFn, env, now: t, places: ps, params, src: catalogSource });
+    if (result.status === 'ok' || result.status === 'off_season') {
+      cache.set(key, { until: t.getTime() + (TTL_MIN[id] ?? 30) * 60_000, result });
+    }
+    return result;
+  }
+
+  /** Readings for one source, filtered and newest first. */
+  async function readings(id, q = {}, opts = {}) {
+    const limit = q.limit == null ? 100 : Number(q.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new HttpError(400, 'limit must be an integer 1-1000');
+    if (q.since != null && Number.isNaN(Date.parse(q.since))) throw new HttpError(400, 'since must be an ISO date or datetime');
+    const r = await run(id, q, opts);
+    let rs = r.readings;
+    if (q.metric) rs = rs.filter((x) => x.metric === q.metric);
+    if (q.since) rs = rs.filter((x) => x.at >= q.since);
+    if (q.forecast === 'false' || q.forecast === false) rs = rs.filter((x) => !x.forecast);
+    rs = [...rs].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
+    return { source: id, status: r.status, ...(r.detail ? { detail: r.detail } : {}), generated_at: now().toISOString(), count: rs.length, readings: rs };
+  }
+
+  async function layer(id, q = {}, opts = {}) {
+    const L = LAYERS[id];
+    if (!L) throw new HttpError(404, `unknown layer '${id}'`, { layers: Object.keys(LAYERS) });
+    const date = q.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now());
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'date must be YYYY-MM-DD');
+    const r = await run(L.source, q, opts);
+    const rs = r.readings.filter((x) => x.metric === L.metric && x.place);
+    const s = catalogSource(L.source);
+    const base = { type: 'FeatureCollection', layer: id, label: L.label, unit: L.unit, ...(L.read ? { read: L.read } : {}), status: r.status,
+      source: { id: s.id, name: s.name, license: s.license, ...(s.attribution ? { attribution: s.attribution } : {}) } };
+    if (L.events) {
+      return { ...base, features: rs.map((x) => feature(x.place, { id: x.id, at: x.at, value: L.value(x), summary: x.summary, url: x.source.url, ...(L.extra ? L.extra(x) : {}) })) };
+    }
+    const features = [];
+    for (const [, group] of pickPerPlace(rs, date)) {
+      const r0 = group[0];
+      const props = { place: r0.place.id, name: r0.place.name, date: r0.at.slice(0, 10), forecast: !!r0.forecast, url: r0.source.url, fetched_at: r0.source.fetched_at };
+      if (L.group) {
+        props.items = group.map((x) => ({ label: x.fields.common_name ?? x.summary, value: L.value(x), summary: x.summary })).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+        props.value = props.items.length;
+        props.unit = L.group;
+      } else {
+        props.value = L.value(r0);
+        props.summary = r0.summary;
+        if (L.extra) Object.assign(props, L.extra(r0));
+      }
+      features.push(feature(r0.place, props));
+    }
+    return { ...base, date, features };
+  }
+
+  function layerCatalog(mode = 'serve') {
+    return Object.entries(LAYERS).map(([id, L]) => {
+      const s = catalogSource(L.source);
+      return { id, label: L.label, unit: L.unit, source: L.source, license: s.license, available: mode !== 'serve' || servable(s.license, env), ...(L.read ? { read: L.read } : {}) };
+    });
+  }
+
+  return { run, readings, layer, layerCatalog, fetchableIds, gate };
+}
+
+function safeSource(id) {
+  try { return catalogSource(id); } catch { throw new HttpError(404, `unknown source '${id}'`); }
+}
+
+const feature = (p, props) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { ...props, place_ref: placeRef(p) } });
+
+/** Per place: the readings dated `date` if any, else the latest observed (not forecast) on or before it. */
+export function pickPerPlace(rs, date) {
+  const by = new Map();
+  for (const r of rs) (by.get(r.place.id) || by.set(r.place.id, []).get(r.place.id)).push(r);
+  const out = new Map();
+  for (const [id, group] of by) {
+    const exact = group.filter((r) => r.at.slice(0, 10) === date);
+    if (exact.length) { out.set(id, exact); continue; }
+    const past = group.filter((r) => r.at.slice(0, 10) <= date && !r.forecast).sort((a, b) => b.at.localeCompare(a.at));
+    if (past.length) out.set(id, past.filter((r) => r.at.slice(0, 10) === past[0].at.slice(0, 10)));
+  }
+  return out;
+}
+
+const valueOf = (r) => r.value;
+const field = (k) => (r) => (Number.isFinite(Number(r.fields?.[k])) && r.fields?.[k] !== null ? Number(r.fields[k]) : null);
+
+export const LAYERS = {
+  temperature: { label: 'Mean temperature', source: 'open-meteo', metric: 'weather_daily', unit: '°C', value: field('temp_mean_c') },
+  wind: { label: 'Max wind', source: 'open-meteo', metric: 'weather_daily', unit: 'km/h', value: field('wind_max_kmh'),
+    extra: (r) => ({ direction_deg: field('wind_dir_deg')(r), north_wind: !!r.fields?.north_wind }), read: 'Dominant direction in direction_deg; north_wind = from NW to NE.' },
+  pressure_change: { label: 'Pressure change (day over day)', source: 'open-meteo', metric: 'weather_daily', unit: 'hPa', value: field('pressure_change_hpa'),
+    read: 'A sharp rise after a fall usually marks a front passing.' },
+  snow_depth: { label: 'Snow depth', source: 'open-meteo', metric: 'weather_daily', unit: 'cm', value: field('snow_depth_cm') },
+  wsi: { label: 'Duck freeze index (WSI)', source: 'waterfowl-wsi', metric: 'waterfowl_wsi', unit: 'index', value: valueOf,
+    read: 'Cumulative cold + snow; higher is harsher. Leave points 7.2 (mallard) and −4.6 (other dabblers) were fit in Missouri and are a prior elsewhere.' },
+  water_level: { label: 'Water level', source: 'noaa-coops', metric: 'water_level', unit: 'ft above datum', value: valueOf,
+    read: 'Great Lakes stations against Low Water Datum (LWD), tidal stations against Mean Lower Low Water (MLLW); each reading says which.' },
+  river_flow: { label: 'River flow', source: 'usgs-water', metric: 'river_discharge', unit: 'ft³/s', value: valueOf },
+  ice: { label: 'Great Lakes ice cover', source: 'glerl', metric: 'lake_ice_cover', unit: '%', value: valueOf, read: 'Lake-wide percentage, published roughly December to May.' },
+  sightings: { label: 'Waterfowl sightings (eBird)', source: 'ebird', metric: 'waterfowl_sightings', unit: 'birds in latest report', value: valueOf, group: 'species reported',
+    read: 'Per region: each species with the count in its latest single report. Not totals; birder effort varies.' },
+  earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
+    extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
+};

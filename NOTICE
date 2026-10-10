@@ -1,0 +1,12 @@
+open-signals
+Copyright 2026 Ryan Cahalane and contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The licence covers the code and the catalogue text only. Data fetched from any
+source remains under that source's own terms, which each reading carries in
+source.license and which catalog/sources.json states per source.
+
+The Weather Severity Index implements the method published in Schummer, M.L.,
+Kaminski, R.M., Raedeke, A.H., Graber, D.A. (2010), Journal of Wildlife
+Management 74(1):94-101.

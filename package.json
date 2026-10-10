@@ -1,0 +1,26 @@
+{
+  "name": "open-signals",
+  "version": "0.1.0",
+  "description": "Public data signals with provenance and licence on every reading: a source catalogue, fetchers, REST, MCP and GeoJSON layers.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": { "open-signals": "bin/open-signals.mjs" },
+  "main": "src/service.js",
+  "exports": {
+    ".": "./src/service.js",
+    "./catalog": "./src/catalog.js",
+    "./contract": "./src/contract.js",
+    "./fetchers": "./src/fetchers/index.js",
+    "./server": "./src/server.js",
+    "./mcp": "./src/mcp.js"
+  },
+  "files": ["bin", "src", "catalog", "LICENSE", "NOTICE", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test tests/*.test.mjs",
+    "test:live": "node scripts/live-check.mjs"
+  },
+  "keywords": ["open-data", "geospatial", "mcp", "signals", "geojson", "noaa", "usgs"],
+  "repository": { "type": "git", "url": "git+https://github.com/Civops-Platform/open-signals.git" }
+}

@@ -1,0 +1,19 @@
+{
+  "about": "Named places the fetchers can read for. Apps pick places by tag; fetchers pick by the identifiers in refs (coops, usgs, ebird). Adding a place is a row here, not a code change. Anything with lat/lng can also be passed ad hoc.",
+  "places": [
+    {"id":"magee-ottawa","name":"Magee Marsh / Ottawa NWR","kind":"marsh","lat":41.62,"lng":-83.2,"state":"OH","tags":["waterfowl"],"refs":{}},
+    {"id":"maumee-bay","name":"Maumee Bay","kind":"bay","lat":41.69,"lng":-83.4,"state":"OH","tags":["waterfowl","ice-fishing"],"refs":{}},
+    {"id":"sandusky-bay","name":"Sandusky Bay","kind":"bay","lat":41.47,"lng":-82.85,"state":"OH","tags":["waterfowl","ice-fishing"],"refs":{}},
+    {"id":"lake-st-clair","name":"Lake St. Clair","kind":"lake","lat":42.45,"lng":-82.7,"state":"MI","tags":["waterfowl","upstream","ice-fishing"],"refs":{}},
+    {"id":"saginaw-bay","name":"Saginaw Bay","kind":"bay","lat":43.75,"lng":-83.85,"state":"MI","tags":["waterfowl","upstream","ice-fishing"],"refs":{}},
+    {"id":"coops-toledo","name":"Lake Erie at Toledo","kind":"lake_station","lat":41.6936,"lng":-83.4723,"state":"OH","tags":["waterfowl"],"refs":{"coops":"9063085"}},
+    {"id":"coops-marblehead","name":"Lake Erie at Marblehead","kind":"lake_station","lat":41.5436,"lng":-82.7314,"state":"OH","tags":["waterfowl"],"refs":{"coops":"9063079"}},
+    {"id":"usgs-maumee-waterville","name":"Maumee River at Waterville","kind":"river_gauge","lat":41.5001,"lng":-83.7127,"state":"OH","tags":["waterfowl"],"refs":{"usgs":"USGS-04193500"}},
+    {"id":"usgs-portage-woodville","name":"Portage River at Woodville","kind":"river_gauge","lat":41.4495,"lng":-83.3613,"state":"OH","tags":["waterfowl"],"refs":{"usgs":"USGS-04195500"}},
+    {"id":"usgs-sandusky-fremont","name":"Sandusky River near Fremont","kind":"river_gauge","lat":41.3078,"lng":-83.1588,"state":"OH","tags":["waterfowl"],"refs":{"usgs":"USGS-04198000"}},
+    {"id":"ebird-lucas","name":"Lucas County, OH","kind":"county","lat":41.62,"lng":-83.65,"state":"OH","tags":["waterfowl"],"refs":{"ebird":"US-OH-095"}},
+    {"id":"ebird-ottawa","name":"Ottawa County, OH","kind":"county","lat":41.55,"lng":-83.1,"state":"OH","tags":["waterfowl"],"refs":{"ebird":"US-OH-123"}},
+    {"id":"ebird-sandusky","name":"Sandusky County, OH","kind":"county","lat":41.36,"lng":-83.14,"state":"OH","tags":["waterfowl"],"refs":{"ebird":"US-OH-143"}},
+    {"id":"ebird-erie","name":"Erie County, OH","kind":"county","lat":41.43,"lng":-82.6,"state":"OH","tags":["waterfowl"],"refs":{"ebird":"US-OH-043"}}
+  ]
+}
