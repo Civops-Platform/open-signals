@@ -66,6 +66,10 @@ object per place or event. Each object's value is its latest reading (value, qua
 source and licence, and its history is every reading held for that place. Subscriptions support sync
 and server-sent-event streams.
 
+CESMII's conformance suite (build 6, run 10 October 2026) rates it **i3X 1.0 Compatible**: 50 passed,
+0 failed, 10 skipped. The skipped tests are the write tests; full compliance needs writes, and a server
+that republishes public data has nothing to write.
+
 The spec requires authentication on data endpoints, so there is a free public read-only token:
 `os-public-read` (send `Authorization: Bearer os-public-read`). `GET /i3x/v1/info` needs none.
 
