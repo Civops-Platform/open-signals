@@ -27,6 +27,10 @@ open-signals has three parts:
 
 ## Use it
 
+A public instance runs at **https://open-signals.civops.io** (REST under `/v1`, MCP at `/mcp`). It
+serves only public-domain and open sources, holds no upstream keys, and is rate-limited per IP.
+Try `https://open-signals.civops.io/v1/layers/volcanoes?elevated=true`.
+
 ```bash
 npx open-signals sources fires                     # search the catalogue
 npx open-signals sources --topic water --fetchable
@@ -63,7 +67,7 @@ Every tool is read-only:
 To add it to a client:
 
 ```json
-{ "mcpServers": { "open-signals": { "type": "http", "url": "https://<host>/mcp" } } }
+{ "mcpServers": { "open-signals": { "type": "http", "url": "https://open-signals.civops.io/mcp" } } }
 ```
 
 ## Licences: what a server will republish
