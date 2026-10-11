@@ -355,6 +355,25 @@ test('gbif: open licences only, species-level only, no observer names; group and
   assert.ok(!/classKey|kingdomKey/.test(g.calls[0].url), 'an unknown group means all');
 });
 
+test('gbif: pages through a large box up to 1,500 records at once; a failed page is left out, duplicates dropped', async () => {
+  const rec = (key) => ({ key, species: 'Odocoileus hemionus', vernacularName: 'Mule Deer', class: 'Mammalia', kingdom: 'Animalia', eventDate: '2026-10-07', decimalLatitude: 43, decimalLongitude: -108, license: 'http://creativecommons.org/licenses/by/4.0/legalcode', recordedBy: 'Observer Name', datasetKey: 'd' });
+  const page = (o) => Array.from({ length: 300 }, (_, i) => rec(o + i));
+  const f = stubFetch([[/occurrence\/search/, (url) => {
+    const o = Number(new URL(url).searchParams.get('offset'));
+    if (o === 600) return res(500, 'upstream hiccup');
+    return res(200, { offset: o, limit: 300, endOfRecords: false, count: 5000, results: o === 300 ? [...page(300), rec(0)] : page(o) });
+  }]]);
+  const { readings } = await gbif.fetch(ctx(f, { params: { bbox: '-111,41,-104,45' } }));
+  const offsets = f.calls.map((c) => Number(new URL(c.url).searchParams.get('offset'))).sort((a, b) => a - b);
+  assert.deepEqual(offsets, [0, 300, 600, 900, 1200], 'stops at 1,500 records although 5,000 match');
+  assert.ok(f.calls.every((c) => /limit=300/.test(c.url) && /license=CC0_1_0&license=CC_BY_4_0/.test(c.url)));
+  assert.equal(readings.length, 1200, 'four good pages, the failed one left out, the repeated record counted once');
+  assert.ok(!JSON.stringify(readings).includes('Observer Name'), 'no observer names');
+  const small = stubFetch([[/occurrence/, () => res(200, { endOfRecords: true, count: 2, results: [rec(1), rec(2)] })]]);
+  assert.equal((await gbif.fetch(ctx(small))).readings.length, 2);
+  assert.equal(small.calls.length, 1, 'one page when it holds everything');
+});
+
 import { nasaEonet, worldBank } from '../src/fetchers/global.js';
 test('nasa-eonet: latest point position of each open event; events without a point are skipped', async () => {
   const f = stubFetch([[/eonet/, () => res(200, { events: [
