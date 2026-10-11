@@ -129,7 +129,7 @@ is not republishing, so the gate doesn't apply there.
 | `emsc` | EMSC-CSEM earthquakes worldwide, densest over Europe (CC BY 4.0), by window and magnitude floor | — |
 | `noaa-ibtracs` | the latest best-track fix of every active tropical cyclone, any basin | — |
 | `eurostat` | industrial production by country (index or year-on-year), latest month, at the capital | — |
-| `wri-gppd` | WRI Global Power Plant Database (CC BY 4.0, static June 2021), plants of 50 MW and up, by country and fuel | — |
+| `gem-trackers` | Global Energy Monitor Global Integrated Power Tracker (CC BY 4.0, 2026-08 release): plants of 50 MW and up, operating or under construction, by country, fuel and status (replaces the WRI database, static since 2021) | — |
 | `openfema` | FEMA disaster declarations of the last 90 days, at the county (or state) point | — |
 | `noaa-coops` | water levels at any CO-OPS station (LWD on the Great Lakes, MLLW on tidal stations) | — |
 | `usgs-water` | river discharge and gage height at any USGS gauge | — |

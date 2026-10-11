@@ -35,7 +35,7 @@ try {
   say(quake.status === 200 && Array.isArray(gj.features), `GET /v1/layers/earthquakes → ${quake.status}, ${gj.features?.length} features`);
   const lvl = await fetch(`${base}/v1/layers/water_level`);
   say(lvl.status === 200, `GET /v1/layers/water_level → ${lvl.status}, ${(await lvl.json()).features?.length} features`);
-  for (const id of ['volcanoes', 'flood_gauges', 'epa_facilities']) {
+  for (const id of ['volcanoes', 'flood_gauges', 'epa_facilities', 'power_plants']) {
     const r = await fetch(`${base}/v1/layers/${id}`);
     const j = await r.json();
     say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${id} → ${r.status}, ${j.features?.length} features${j.error ? ` (${j.error})` : ''}`);

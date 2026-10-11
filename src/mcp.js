@@ -62,7 +62,7 @@ export const TOOLS = [
   {
     name: 'get_layer',
     description: 'One map layer as a GeoJSON FeatureCollection: one point per place with the reading on the date (else the latest observed before it, never a guess), or one point per event for event layers.',
-    inputSchema: { type: 'object', properties: { id: { type: 'string', enum: Object.keys(LAYERS) }, date: { type: 'string', description: 'YYYY-MM-DD; default today (US Eastern).' }, ...placeArgs, window: { type: 'string' }, min: { type: 'string' }, state: { type: 'string' }, bbox: { type: 'string' }, elevated: { type: 'boolean' }, indicator: { type: 'string' }, country: { type: 'string', description: 'power_plants: ISO alpha-3, e.g. DEU' }, fuel: { type: 'string' }, min_mw: { type: 'number' } }, required: ['id'] },
+    inputSchema: { type: 'object', properties: { id: { type: 'string', enum: Object.keys(LAYERS) }, date: { type: 'string', description: 'YYYY-MM-DD; default today (US Eastern).' }, ...placeArgs, window: { type: 'string' }, min: { type: 'string' }, state: { type: 'string' }, bbox: { type: 'string' }, elevated: { type: 'boolean' }, indicator: { type: 'string' }, country: { type: 'string', description: 'power_plants: ISO alpha-3, e.g. DEU' }, fuel: { type: 'string', description: 'power_plants: coal, oil/gas, nuclear, hydropower, wind, utility-scale solar, geothermal or bioenergy' }, min_mw: { type: 'number' }, status: { type: 'string', description: 'power_plants: operating | construction' } }, required: ['id'] },
   },
 ];
 

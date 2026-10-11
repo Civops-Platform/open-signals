@@ -72,7 +72,7 @@ export const openapi = {
     '/v1/layers/{id}': {
       get: {
         summary: 'One layer as GeoJSON',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', enum: Object.keys(LAYERS) } }, qp('date', 'YYYY-MM-DD'), ...placeParams, qp('window', 'event layers'), qp('min', 'event layers'), qp('state', 'epa_facilities'), qp('bbox', 'flood_gauges'), qp('elevated', 'volcanoes'), qp('indicator', 'world_bank, eu_industrial_production'), qp('country', 'power_plants (ISO alpha-3)'), qp('fuel', 'power_plants'), qp('min_mw', 'power_plants')],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', enum: Object.keys(LAYERS) } }, qp('date', 'YYYY-MM-DD'), ...placeParams, qp('window', 'event layers'), qp('min', 'event layers'), qp('state', 'epa_facilities'), qp('bbox', 'flood_gauges'), qp('elevated', 'volcanoes'), qp('indicator', 'world_bank, eu_industrial_production'), qp('country', 'power_plants (ISO alpha-3)'), qp('fuel', 'power_plants'), qp('min_mw', 'power_plants'), qp('status', 'power_plants: operating | construction')],
         responses: { 200: { description: 'GeoJSON FeatureCollection', content: { 'application/geo+json': { schema: { type: 'object' } } } }, ...errors },
       },
     },

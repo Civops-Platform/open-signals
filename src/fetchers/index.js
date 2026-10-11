@@ -21,10 +21,10 @@ import { gbif } from './gbif.js';
 import { nasaEonet, worldBank } from './global.js';
 import { emsc, ibtracs } from './world-hazards.js';
 import { eurostat } from './europe.js';
-import { wriPowerPlants } from './power-plants.js';
+import { gemPowerPlants } from './power-plants.js';
 import { openfema } from './fema.js';
 
 export const FETCHERS = Object.fromEntries(
   [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho, openfdaRecalls, usaspendingAwards, gbif, nasaEonet, worldBank,
-    emsc, ibtracs, eurostat, wriPowerPlants, openfema].map((x) => [x.source, x]),
+    emsc, ibtracs, eurostat, gemPowerPlants, openfema].map((x) => [x.source, x]),
 );
