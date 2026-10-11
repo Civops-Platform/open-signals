@@ -25,6 +25,7 @@ const TTL_MIN = {
   emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, openfema: 60,
   'gem-trackers': 1440, 'open-meteo-flood': 180, 'open-meteo-air': 60, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
+  'usace-mvn-locks': 30, 'nrcs-snotel': 360, 'us-drought-monitor': 720, 'noaa-spc-reports': 10, 'nifc-wfigs': 15,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -267,4 +268,20 @@ export const LAYERS = {
   volcanoes_world: { label: 'Volcanoes worldwide, recent eruptions (Smithsonian GVP)', source: 'smithsonian-gvp', metric: 'volcano_last_eruption', unit: 'year of last eruption', value: valueOf, events: true,
     extra: (r) => ({ continuing_eruption: r.fields.continuing_eruption, eruption_start: r.fields.eruption_start, country: r.fields.country, volcano_type: r.fields.volcano_type }),
     read: 'Holocene volcanoes whose last known eruption is in or after erupted_since (default 1900), from the Volcanoes of the World database; continuing=true keeps those GVP lists as erupting now. The US layer volcanoes carries USGS alert levels; this one has no alert levels.' },
+  // US waterway, snow, drought, storm and wildfire layers (src/fetchers/us-water-hazards.js)
+  lock_delays: { label: 'Lock queues and closures, Louisiana (USACE New Orleans District)', source: 'usace-mvn-locks', metric: 'lock_queue', unit: 'hours queue', value: valueOf, events: true,
+    extra: (r) => ({ status: r.fields.status, status_rank: r.fields.status_rank, locking_count_primary: r.fields.locking_count_primary, locking_count_secondary: r.fields.locking_count_secondary, gage_primary_ft: r.fields.gage_primary_ft, gage_secondary_ft: r.fields.gage_secondary_ft }),
+    read: 'Queue time in hours and open/restricted/closed status at the sixteen locks and floodgates of the USACE New Orleans District (Gulf Intracoastal Waterway, Atchafalaya, Mississippi), as entered by lock staff, usually daily. Only this district publishes a keyless feed; no other inland lock has queue or delay data here. status_rank 0 open, 1 restricted, 2 intermittent closure, 3 closed. US Government data, provided without warranty.' },
+  snowpack: { label: 'Snowpack, snow water equivalent (NRCS SNOTEL)', source: 'nrcs-snotel', metric: 'snow_water_equivalent', unit: 'in SWE', value: valueOf, events: true,
+    extra: (r) => ({ pct_of_median: r.fields.pct_of_median, median_in: r.fields.median_in, elevation_ft: r.fields.elevation_ft, median_peak_in: r.fields.median_peak_in }),
+    read: 'Latest daily snow water equivalent at every active SNOTEL station (western US and Alaska), with its percent of the 1991-2020 median for the day; pct_of_median is null when the median is no snow. Provisional data, subject to revision.' },
+  drought: { label: 'Drought by county (US Drought Monitor)', source: 'us-drought-monitor', metric: 'drought_category', unit: 'worst category (-1 none, 0 D0 … 4 D4)', value: valueOf, events: true,
+    extra: (r) => ({ category: r.fields.category, pct_in_drought: r.fields.pct_in_drought, map_date: r.fields.map_date, previous_category: r.fields.previous_category, change: r.fields.change }),
+    read: 'The current weekly map, one point per county at its Census internal point: the worst category touching the county and the percent of it in drought (D1+). Default only counties at D0 or worse; min=none|D0|D1|D2|D3|D4 and state=XX narrow it. change is +1 worse, -1 better than the week before. The U.S. Drought Monitor is jointly produced by the National Drought Mitigation Center at the University of Nebraska-Lincoln, the United States Department of Agriculture, the National Oceanic and Atmospheric Administration and the National Aeronautics and Space Administration. Map courtesy of NDMC.' },
+  storm_reports: { label: 'Storm reports today and yesterday (NOAA SPC)', source: 'noaa-spc-reports', metric: 'storm_report', unit: 'varies by kind', value: valueOf, events: true,
+    extra: (r) => ({ kind: r.fields.kind, kind_rank: r.fields.kind_rank, convective_day: r.fields.convective_day, nws_office: r.fields.nws_office }),
+    read: 'Preliminary filtered tornado, hail and damaging-wind reports for the current and previous SPC convective day (12 UTC to 12 UTC). value is the EF rating for a tornado (null if unknown), hail diameter in inches, or gust in mph (null if estimated from damage). kind= narrows it. Report comments are not served.' },
+  wildfire_incidents: { label: 'Wildfires burning now (NIFC WFIGS)', source: 'nifc-wfigs', metric: 'wildfire_incident', unit: 'acres', value: valueOf, events: true,
+    extra: (r) => ({ percent_contained: r.fields.percent_contained, discovered: r.fields.discovered, cause: r.fields.cause, gacc: r.fields.gacc, personnel: r.fields.personnel }),
+    read: 'Every wildfire incident in IRWIN not yet declared contained, controlled or out, at its point of origin; small fires drop off after a few days without an update. kind=prescribed|all adds prescribed fires.' },
 };

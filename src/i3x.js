@@ -54,6 +54,11 @@ export const I3X_LAYERS = {
   river_discharge: {},
   air_quality: {},
   volcanoes_world: {},
+  lock_delays: {},
+  snowpack: {},
+  drought: { q: { min: 'D1' } },
+  storm_reports: {},
+  wildfire_incidents: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');

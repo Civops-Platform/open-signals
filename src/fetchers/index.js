@@ -26,10 +26,12 @@ import { openfema } from './fema.js';
 import { amsBargeLocks, btsBorderCrossings, epaTri, epaCampd } from './us-freight-emissions.js';
 import { openMeteoFlood, openMeteoAir } from './open-meteo-global.js';
 import { smithsonianVolcanoes } from './volcanoes-world.js';
+import { usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs } from './us-water-hazards.js';
 
 export const FETCHERS = Object.fromEntries(
   [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho, openfdaRecalls, usaspendingAwards, gbif, nasaEonet, worldBank,
     emsc, ibtracs, eurostat, gemPowerPlants, openfema,
     openMeteoFlood, openMeteoAir, smithsonianVolcanoes,
-    amsBargeLocks, btsBorderCrossings, epaTri, epaCampd].map((x) => [x.source, x]),
+    amsBargeLocks, btsBorderCrossings, epaTri, epaCampd,
+    usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs].map((x) => [x.source, x]),
 );
