@@ -20,9 +20,12 @@ import { reading } from '../contract.js';
 import { getJson, getText } from './http.js';
 import { US_STATES } from './epa-echo.js';
 
-/** RFC 4180 CSV → array of rows (quoted fields, doubled quotes, newlines inside quotes). */
-export function parseCsv(text) {
-  const rows = [];
+/**
+ * RFC 4180 CSV, one row at a time (quoted fields, doubled quotes, newlines inside quotes). A generator,
+ * so a big state file (Texas CAMPD daily is 31 MB) never sits in memory as hundreds of thousands of rows
+ * at once; building them all ran the server out of heap.
+ */
+export function* csvRows(text) {
   let row = [], field = '', q = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
@@ -33,19 +36,22 @@ export function parseCsv(text) {
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && text[i + 1] === '\n') i++;
       row.push(field); field = '';
-      if (row.length > 1 || row[0] !== '') rows.push(row);
+      if (row.length > 1 || row[0] !== '') yield row;
       row = [];
     } else field += c;
   }
-  if (field !== '' || row.length) { row.push(field); rows.push(row); }
-  return rows;
+  if (field !== '' || row.length) { row.push(field); yield row; }
 }
 
-/** CSV → objects keyed by header; `clean` rewrites each header (e.g. strips TRI's "12. " prefixes). */
-function csvObjects(text, clean = (h) => h) {
-  const [head, ...rest] = parseCsv(text.replace(/^﻿/, ''));
+/** RFC 4180 CSV → array of rows. */
+export function parseCsv(text) { return [...csvRows(text)]; }
+
+/** CSV → objects keyed by header, one at a time; `clean` rewrites each header (e.g. strips TRI's "12. " prefixes). */
+function* csvObjects(text, clean = (h) => h) {
+  const rows = csvRows(text.replace(/^\uFEFF/, ''));
+  const head = rows.next().value;
   const keys = (head || []).map((h) => clean(h.trim()));
-  return rest.map((r) => Object.fromEntries(keys.map((k, i) => [k, r[i] ?? ''])));
+  for (const r of rows) yield Object.fromEntries(keys.map((k, i) => [k, r[i] ?? '']));
 }
 
 const num = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -237,11 +243,11 @@ export const epaCampd = {
       const lat = num(r.Latitude), lng = num(r.Longitude);
       if (lat != null && lng != null) where.set(r['Facility ID'], { lat, lng, county: r.County || null, owner: r['Owner/Operator'] || null, category: r['Source Category'] || null });
     }
-    const rows = csvObjects(daily.text);
-    const lastDate = rows.reduce((m, r) => (r.Date > m ? r.Date : m), '');
+    let lastDate = '';
+    for (const r of csvObjects(daily.text)) if (r.Date > lastDate) lastDate = r.Date;
     const month = lastDate.slice(0, 7);
     const fac = new Map();
-    for (const r of rows) {
+    for (const r of csvObjects(daily.text)) {
       const x = fac.get(r['Facility ID']) || fac.set(r['Facility ID'], { name: r['Facility Name'], units: new Set(), fuels: new Set(), m: { co2: 0, so2: 0, nox: 0, mwh: 0, mmbtu: 0 }, ytd: { co2: 0, so2: 0, nox: 0, mwh: 0 }, last: '' }).get(r['Facility ID']);
       x.units.add(r['Unit ID']);
       if (r['Primary Fuel Type']) x.fuels.add(r['Primary Fuel Type']);
