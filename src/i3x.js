@@ -47,6 +47,9 @@ export const I3X_LAYERS = {
   power_plants: { q: { min_mw: 2000 } },
   eu_industrial_production: { q: { indicator: 'industrial_production' } },
   fema_declarations: {},
+  river_discharge: {},
+  air_quality: {},
+  volcanoes_world: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');

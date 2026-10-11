@@ -138,6 +138,9 @@ is not republishing, so the gate doesn't apply there.
 | `open-meteo` | daily weather, 92 days back and 7 forward, anywhere | — (non-commercial) |
 | `waterfowl-wsi` | the duck Weather Severity Index (Schummer et al. 2010) from Open-Meteo | — (non-commercial) |
 | `ebird` | waterfowl reported in an eBird region in the last 7 days | `EBIRD_API_KEY` (free, non-commercial) |
+| `open-meteo-flood` | GloFAS river discharge today at about a hundred large-river locations worldwide, with the week's change and the 30-day ensemble high | — (non-commercial) |
+| `open-meteo-air` | CAMS modelled air quality now at 150 large cities: US AQI, European AQI, PM2.5, PM10 | — (non-commercial) |
+| `smithsonian-gvp` | Smithsonian Volcanoes of the World: volcanoes erupting since 1900 worldwide, and those erupting now | — (non-commercial) |
 
 The rest of the catalogue is listed but not fetched yet. Adding a fetcher is the most useful
 contribution; see [CONTRIBUTING.md](CONTRIBUTING.md).

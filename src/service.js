@@ -23,7 +23,7 @@ const TTL_MIN = {
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
   'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
   emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, openfema: 60,
-  'gem-trackers': 1440,
+  'gem-trackers': 1440, 'open-meteo-flood': 180, 'open-meteo-air': 60, 'smithsonian-gvp': 720,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -34,6 +34,9 @@ const DEFAULT_PLACES = {
   'noaa-coops': (ps) => ps.filter((p) => p.refs?.coops),
   'usgs-water': (ps) => ps.filter((p) => p.refs?.usgs),
   ebird: (ps) => ps.filter((p) => p.refs?.ebird),
+  // none from the catalogue: these read their own world lists (catalog/world-*.json) unless a caller names places
+  'open-meteo-flood': () => [],
+  'open-meteo-air': () => [],
 };
 
 /**
@@ -241,4 +244,13 @@ export const LAYERS = {
     read: 'One point per declared county (its Census internal point), or a state point for statewide and tribal declarations. Value 3 major disaster, 2 emergency, 1 fire management. Uses the OpenFEMA API; not endorsed by FEMA.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
+  river_discharge: { label: 'River discharge, large rivers worldwide (GloFAS)', source: 'open-meteo-flood', metric: 'river_discharge', unit: 'm³/s', value: valueOf, events: true,
+    extra: (r) => ({ river: r.fields.river, change_7d_pct: r.fields.change_7d_pct, ratio_to_ensemble_median: r.fields.ratio_to_ensemble_median, peak_30d_ensemble_max_m3s: r.fields.peak_30d_ensemble_max_m3s, peak_30d_date: r.fields.peak_30d_date }),
+    read: 'Modelled daily discharge today (UTC) at about a hundred large-river locations, from GloFAS v4. change_7d_pct compares with a week ago; ratio_to_ensemble_median is against the median of the GloFAS ensemble for the day, not a long-term normal; peak_30d is the highest ensemble member over the next 30 days.' },
+  air_quality: { label: 'Air quality, large cities worldwide (CAMS)', source: 'open-meteo-air', metric: 'air_quality', unit: 'US AQI', value: valueOf, events: true,
+    extra: (r) => ({ us_aqi_category: r.fields.us_aqi_category, european_aqi: r.fields.european_aqi, pm2_5_ugm3: r.fields.pm2_5_ugm3, pm10_ugm3: r.fields.pm10_ugm3 }),
+    read: 'Current modelled air quality at 150 large cities, from CAMS forecasts (about 11 km over Europe, 45 km elsewhere): a model, not a monitor at street level. US AQI 0-50 good, 51-100 moderate, 101-150 unhealthy for sensitive groups, 151-200 unhealthy, 201-300 very unhealthy, over 300 hazardous.' },
+  volcanoes_world: { label: 'Volcanoes worldwide, recent eruptions (Smithsonian GVP)', source: 'smithsonian-gvp', metric: 'volcano_last_eruption', unit: 'year of last eruption', value: valueOf, events: true,
+    extra: (r) => ({ continuing_eruption: r.fields.continuing_eruption, eruption_start: r.fields.eruption_start, country: r.fields.country, volcano_type: r.fields.volcano_type }),
+    read: 'Holocene volcanoes whose last known eruption is in or after erupted_since (default 1900), from the Volcanoes of the World database; continuing=true keeps those GVP lists as erupting now. The US layer volcanoes carries USGS alert levels; this one has no alert levels.' },
 };

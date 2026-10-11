@@ -23,8 +23,11 @@ import { emsc, ibtracs } from './world-hazards.js';
 import { eurostat } from './europe.js';
 import { gemPowerPlants } from './power-plants.js';
 import { openfema } from './fema.js';
+import { openMeteoFlood, openMeteoAir } from './open-meteo-global.js';
+import { smithsonianVolcanoes } from './volcanoes-world.js';
 
 export const FETCHERS = Object.fromEntries(
   [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho, openfdaRecalls, usaspendingAwards, gbif, nasaEonet, worldBank,
-    emsc, ibtracs, eurostat, gemPowerPlants, openfema].map((x) => [x.source, x]),
+    emsc, ibtracs, eurostat, gemPowerPlants, openfema,
+    openMeteoFlood, openMeteoAir, smithsonianVolcanoes].map((x) => [x.source, x]),
 );

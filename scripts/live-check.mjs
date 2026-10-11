@@ -40,6 +40,10 @@ try {
     const j = await r.json();
     say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${id} → ${r.status}, ${j.features?.length} features${j.error ? ` (${j.error})` : ''}`);
   }
+  for (const id of ['river_discharge', 'air_quality', 'volcanoes_world']) {
+    const r = await fetch(`${base}/v1/layers/${id}`);
+    say(r.status === 451, `GET /v1/layers/${id} (public mode, non-commercial source) → ${r.status} (expected 451)`);
+  }
   const gated = await fetch(`${base}/v1/readings?source=open-meteo&lat=41.5&lng=-81.7`);
   say(gated.status === 451, `GET /v1/readings?source=open-meteo (public mode) → ${gated.status} (expected 451)`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
