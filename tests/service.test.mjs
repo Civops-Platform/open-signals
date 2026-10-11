@@ -307,3 +307,21 @@ test('i3X engine: a reading with no place conforms to its type (place may be nul
   assert.deepEqual(t.schema.properties.place.type, ['object', 'null']);
   assert.equal(v.value.place, null);
 });
+
+test('an upstream that refuses for rate is rested, and the last good answer serves meanwhile, marked stale', async () => {
+  let t = NOW.getTime(), fail = false, calls = 0;
+  const f = async (url) => { calls++; return fail ? res(429, { error: true, reason: 'Daily API request limit exceeded.' }) : res(200, quakes); };
+  const svc = createService({ fetch: f, env: {}, now: () => new Date(t) });
+  const first = await svc.readings('usgs-earthquakes', {});
+  assert.ok(first.count > 0);
+  t += 3 * 60 * 60_000; fail = true; // past the cache, and the upstream now refuses
+  const before = calls;
+  const r = await svc.readings('usgs-earthquakes', {});
+  assert.equal(r.status, 'stale');
+  assert.equal(r.count, first.count);
+  const tries = calls - before;
+  await svc.readings('usgs-earthquakes', {}); // resting: no new upstream call
+  assert.equal(calls - before, tries);
+  const fresh = createService({ fetch: f, env: {}, now: () => new Date(t) });
+  await assert.rejects(fresh.readings('usgs-earthquakes', {}), (e) => e.status === 429 || e.status === 502 || e.status === 503);
+});

@@ -23,7 +23,7 @@ const TTL_MIN = {
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
   'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
   emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, openfema: 60,
-  'gem-trackers': 1440, 'open-meteo-flood': 180, 'open-meteo-air': 60, 'smithsonian-gvp': 720,
+  'gem-trackers': 1440, 'open-meteo-flood': 720, 'open-meteo-air': 180, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
   'usace-mvn-locks': 30, 'nrcs-snotel': 360, 'us-drought-monitor': 720, 'noaa-spc-reports': 10, 'nifc-wfigs': 15,
 };
@@ -79,6 +79,7 @@ const splitList = (v) => (v == null || v === '' ? [] : String(v).split(',').map(
 
 export function createService({ fetch: fetchFn = globalThis.fetch, env = process.env, now = () => new Date(), fetchers = FETCHERS, places = PLACES } = {}) {
   const cache = new Map();
+  const cooldown = new Map(); // source id -> { until, detail } after a 429
 
   function gate(id, mode) {
     const s = safeSource(id);
@@ -103,12 +104,22 @@ export function createService({ fetch: fetchFn = globalThis.fetch, env = process
     const hit = cache.get(key);
     const t = now();
     if (hit && hit.until > t.getTime()) return hit.result;
+    // After an upstream refuses for rate (429), leave it alone for a while: asking again only spends
+    // more of its limit and holds the caller past the proxy's timeout. The last good answer serves meanwhile.
+    const stale = (detail) => (hit ? { ...hit.result, status: 'stale', stale_since: new Date(hit.until).toISOString(), detail } : null);
+    const cool = cooldown.get(id);
+    if (cool && cool.until > t.getTime()) {
+      const s0 = stale(cool.detail); if (s0) return s0;
+      throw new HttpError(503, `${id} is resting after its upstream refused for rate; try after ${new Date(cool.until).toISOString()}`, { retry_after: new Date(cool.until).toISOString() });
+    }
     let result;
     try {
       result = await f.fetch({ fetch: fetchFn, env, now: t, places: ps, params, src: catalogSource });
     } catch (e) {
       // A fetcher rejecting its own parameters is the caller's error; an upstream failure is not.
       if (e.status === 400 && e.body === undefined) throw new HttpError(400, e.message);
+      if (e.status === 429) cooldown.set(id, { until: t.getTime() + (/daily|day/i.test(e.message) ? 60 : 10) * 60_000, detail: e.message.slice(0, 200) });
+      const s1 = stale(`upstream failed: ${e.message.slice(0, 200)}`); if (s1) return s1;
       throw e;
     }
     if (result.status === 'ok' || result.status === 'off_season') {
