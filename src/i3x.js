@@ -51,6 +51,9 @@ export const I3X_LAYERS = {
   border_crossings: {},
   toxic_releases: { q: { state: 'OH' } },
   power_emissions: { q: { state: 'OH' } },
+  river_discharge: {},
+  air_quality: {},
+  volcanoes_world: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');

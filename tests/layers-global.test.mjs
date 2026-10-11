@@ -1,11 +1,11 @@
-// EMSC, IBTrACS, Eurostat, WRI power plants and OpenFEMA against payloads recorded from the real
+// EMSC, IBTrACS, Eurostat, GEM power plants and OpenFEMA against payloads recorded from the real
 // upstreams on 2026-10-10 (tests/fixtures). No network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { emsc, ibtracs } from '../src/fetchers/world-hazards.js';
 import { eurostat, jsonStatRows } from '../src/fetchers/europe.js';
-import { wriPowerPlants, powerPlantTable } from '../src/fetchers/power-plants.js';
+import { gemPowerPlants, powerPlantTable, FUELS } from '../src/fetchers/power-plants.js';
 import { openfema, fipsPoint } from '../src/fetchers/fema.js';
 import { validateReading } from '../src/contract.js';
 import { createService, LAYERS } from '../src/service.js';
@@ -15,7 +15,7 @@ import { NOW, res, stubFetch, ctx } from './helpers.mjs';
 
 const fx = (f) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), 'utf8');
 const valid = (rs) => rs.forEach((r) => assert.deepEqual(validateReading(r), [], JSON.stringify(r)));
-const NEW_LAYERS = { earthquakes_emsc: 'emsc', tropical_cyclones: 'noaa-ibtracs', power_plants: 'wri-gppd', eu_industrial_production: 'eurostat', fema_declarations: 'openfema' };
+const NEW_LAYERS = { earthquakes_emsc: 'emsc', tropical_cyclones: 'noaa-ibtracs', power_plants: 'gem-trackers', eu_industrial_production: 'eurostat', fema_declarations: 'openfema' };
 
 test('new layers: each source is catalogued with a servable licence, a terms URL read this session, and an i3X folder', () => {
   for (const [id, src] of Object.entries(NEW_LAYERS)) {
@@ -99,22 +99,39 @@ test('eurostat: JSON-stat unpacked; latest month per country at its capital; agg
   assert.match(g.calls[0].url, /unit=PCH_SM&s_adj=CA/);
 });
 
-test('power plants: committed table is compact and 50 MW and up; default 1000 MW worldwide, country and fuel filters, bad params are 400s', async () => {
+test('power plants: committed GEM table is compact, plants of 50 MW and up with ISO3 countries; default 1000 MW worldwide; country, fuel and status filters; bad params are 400s', async () => {
   const t = powerPlantTable();
   assert.ok(readFileSync(new URL('../catalog/power-plants.json', import.meta.url)).length < 3e6);
-  assert.ok(t.plants.length > 10000 && t.plants.every((p) => p[5] >= 50));
-  const all = await wriPowerPlants.fetch(ctx(null));
+  const ix = Object.fromEntries(t.fields.map((k, i) => [k, i]));
+  assert.deepEqual(t.fuels, FUELS, 'the fetcher and the table agree on the fuel list');
+  assert.ok(t.plants.length > 20000 && t.plants.every((p) => p[ix.operating_mw] + p[ix.construction_mw] >= 50));
+  assert.ok(t.plants.every((p) => p[ix.country] === null || /^[A-Z]{3}$/.test(p[ix.country])));
+  const all = await gemPowerPlants.fetch(ctx(null));
   assert.ok(all.readings.length > 1000 && all.readings.every((r) => r.value >= 1000));
   valid(all.readings.slice(0, 50));
-  const three = all.readings.find((r) => r.id === 'wri-gppd:WRI1000452');
-  assert.equal(three.place.name, 'Three Gorges Dam');
-  assert.equal(three.value, 22500);
+  const three = all.readings.find((r) => r.id === 'gem-trackers:L100000601194');
+  assert.equal(three.place.name, 'Three Gorges Dam hydroelectric plant');
+  assert.deepEqual([three.value, three.fields.fuel, three.fields.country, three.fields.status], [22500, 'hydropower', 'CHN', 'operating']);
   assert.equal(three.source.license, 'open');
-  const de = await wriPowerPlants.fetch(ctx(null, { params: { country: 'deu', fuel: 'coal' } }));
-  assert.ok(de.readings.length > 10 && de.readings.every((r) => r.fields.country === 'DEU' && r.fields.fuel === 'Coal' && r.value >= 50));
-  await assert.rejects(wriPowerPlants.fetch(ctx(null, { params: { country: 'Germany' } })), (e) => e.status === 400);
-  await assert.rejects(wriPowerPlants.fetch(ctx(null, { params: { fuel: 'unicorn' } })), (e) => e.status === 400);
-  await assert.rejects(wriPowerPlants.fetch(ctx(null, { params: { min_mw: 'lots' } })), (e) => e.status === 400);
+  assert.equal(three.source.url, 'https://www.gem.wiki/Three_Gorges_Dam_hydroelectric_plant');
+  assert.ok(!('owner' in three.fields), 'owners are left out: GEM records some as named people');
+  const building = await gemPowerPlants.fetch(ctx(null, { params: { status: 'construction', min_mw: '5000' } }));
+  assert.ok(building.readings.length > 0 && building.readings.every((r) => r.fields.construction_mw > 0));
+  const de = await gemPowerPlants.fetch(ctx(null, { params: { country: 'deu', fuel: 'Coal' } }));
+  assert.ok(de.readings.length > 10 && de.readings.every((r) => r.fields.country === 'DEU' && r.fields.fuels.includes('coal') && r.value >= 50));
+  const gas = await gemPowerPlants.fetch(ctx(null, { params: { fuel: 'oil/gas', min_mw: '50' } }));
+  assert.ok(gas.readings.some((r) => r.fields.fuel !== 'oil/gas'), 'a mixed coal and gas plant matches on its second fuel');
+  await assert.rejects(gemPowerPlants.fetch(ctx(null, { params: { country: 'Germany' } })), (e) => e.status === 400);
+  await assert.rejects(gemPowerPlants.fetch(ctx(null, { params: { fuel: 'Gas' } })), (e) => e.status === 400);
+  await assert.rejects(gemPowerPlants.fetch(ctx(null, { params: { status: 'retired' } })), (e) => e.status === 400);
+  await assert.rejects(gemPowerPlants.fetch(ctx(null, { params: { min_mw: 'lots' } })), (e) => e.status === 400);
+});
+
+test('power plants: WRI GPPD stays catalogued as superseded, with no fetcher', () => {
+  const w = source('wri-gppd');
+  assert.equal(w.fetcher, null);
+  assert.equal(w.superseded_by, 'gem-trackers');
+  assert.equal(source('gem-trackers').terms, 'https://globalenergymonitor.org/creative-commons-license');
 });
 
 test('openfema: county at its Census point, tribal (county 000) at the state point, a territory with no point kept but unplaced', async () => {

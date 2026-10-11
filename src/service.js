@@ -22,7 +22,8 @@ const TTL_MIN = {
   'open-meteo': 60, 'waterfowl-wsi': 60, 'noaa-coops': 30, 'usgs-water': 30,
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
   'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
-  emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, 'wri-gppd': 1440, openfema: 60,
+  emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, openfema: 60,
+  'gem-trackers': 1440, 'open-meteo-flood': 180, 'open-meteo-air': 60, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
 };
 
@@ -34,6 +35,9 @@ const DEFAULT_PLACES = {
   'noaa-coops': (ps) => ps.filter((p) => p.refs?.coops),
   'usgs-water': (ps) => ps.filter((p) => p.refs?.usgs),
   ebird: (ps) => ps.filter((p) => p.refs?.ebird),
+  // none from the catalogue: these read their own world lists (catalog/world-*.json) unless a caller names places
+  'open-meteo-flood': () => [],
+  'open-meteo-air': () => [],
 };
 
 /**
@@ -229,9 +233,10 @@ export const LAYERS = {
   tropical_cyclones: { label: 'Tropical cyclones worldwide (IBTrACS)', source: 'noaa-ibtracs', metric: 'tropical_cyclone', unit: 'kt', value: valueOf, events: true,
     extra: (r) => ({ basin: r.fields.basin, category: r.fields.category, pressure_hpa: r.fields.pressure_hpa }),
     read: 'The latest best-track fix of every storm in the IBTrACS ACTIVE file, any basin, fixes within 7 days of the newest. Provisional tracks; NCEI refreshes the file every few days, so a fix can be a day or more old.' },
-  power_plants: { label: 'Power plants (WRI Global Power Plant Database)', source: 'wri-gppd', metric: 'power_plant', unit: 'MW', value: valueOf, events: true,
-    extra: (r) => ({ fuel: r.fields.fuel, country: r.fields.country, commissioning_year: r.fields.commissioning_year, owner: r.fields.owner }),
-    read: 'Static database as of June 2021 (v1.3.0), plants of 50 MW or more. Default: 1000 MW or more worldwide; country=DEU gives every plant there of 50 MW or more; fuel= and min_mw= narrow it.' },
+  power_plants: { label: 'Power plants (Global Energy Monitor)', source: 'gem-trackers', metric: 'power_plant', unit: 'MW', value: valueOf, events: true,
+    extra: (r) => ({ fuel: r.fields.fuel, fuels: r.fields.fuels, status: r.fields.status, operating_mw: r.fields.operating_mw, construction_mw: r.fields.construction_mw,
+      country: r.fields.country, first_unit_year: r.fields.first_unit_year }),
+    read: 'GEM Global Integrated Power Tracker, plants of 50 MW or more operating or under construction; value is the two together. Default: 1000 MW or more worldwide; country=DEU gives every plant there of 50 MW or more; fuel= (coal, oil/gas, nuclear, hydropower, wind, utility-scale solar, geothermal, bioenergy), status= (operating, construction) and min_mw= narrow it.' },
   eu_industrial_production: { label: 'Industrial production by country (Eurostat)', source: 'eurostat', metric: null, unit: 'varies', value: valueOf, events: true,
     extra: (r) => ({ indicator: r.fields.label, month: r.fields.month, status: r.fields.status }),
     read: 'Latest month per country (EU, EFTA and candidates), at its capital. indicator=industrial_production is an index (2021 = 100); industrial_production_yoy is % on the same month a year earlier.' },
@@ -253,4 +258,13 @@ export const LAYERS = {
   power_emissions: { label: 'Power-plant emissions (EPA Clean Air Markets)', source: 'epa-campd', metric: 'power_emissions', unit: 'short tons CO2/month', value: valueOf, events: true,
     extra: (r) => ({ month: r.fields.month, so2_tons: r.fields.so2_tons, nox_tons: r.fields.nox_tons, gross_load_mwh: r.fields.gross_load_mwh, primary_fuels: r.fields.primary_fuels }),
     read: 'CO2, SO2 and NOx from the CAMPD daily bulk file, summed per facility over the latest month in it, one state (state=XX, default OH). EPA publishes the current year quarterly, so the latest month can be several months back.' },
+  river_discharge: { label: 'River discharge, large rivers worldwide (GloFAS)', source: 'open-meteo-flood', metric: 'river_discharge', unit: 'm³/s', value: valueOf, events: true,
+    extra: (r) => ({ river: r.fields.river, change_7d_pct: r.fields.change_7d_pct, ratio_to_ensemble_median: r.fields.ratio_to_ensemble_median, peak_30d_ensemble_max_m3s: r.fields.peak_30d_ensemble_max_m3s, peak_30d_date: r.fields.peak_30d_date }),
+    read: 'Modelled daily discharge today (UTC) at about a hundred large-river locations, from GloFAS v4. change_7d_pct compares with a week ago; ratio_to_ensemble_median is against the median of the GloFAS ensemble for the day, not a long-term normal; peak_30d is the highest ensemble member over the next 30 days.' },
+  air_quality: { label: 'Air quality, large cities worldwide (CAMS)', source: 'open-meteo-air', metric: 'air_quality', unit: 'US AQI', value: valueOf, events: true,
+    extra: (r) => ({ us_aqi_category: r.fields.us_aqi_category, european_aqi: r.fields.european_aqi, pm2_5_ugm3: r.fields.pm2_5_ugm3, pm10_ugm3: r.fields.pm10_ugm3 }),
+    read: 'Current modelled air quality at 150 large cities, from CAMS forecasts (about 11 km over Europe, 45 km elsewhere): a model, not a monitor at street level. US AQI 0-50 good, 51-100 moderate, 101-150 unhealthy for sensitive groups, 151-200 unhealthy, 201-300 very unhealthy, over 300 hazardous.' },
+  volcanoes_world: { label: 'Volcanoes worldwide, recent eruptions (Smithsonian GVP)', source: 'smithsonian-gvp', metric: 'volcano_last_eruption', unit: 'year of last eruption', value: valueOf, events: true,
+    extra: (r) => ({ continuing_eruption: r.fields.continuing_eruption, eruption_start: r.fields.eruption_start, country: r.fields.country, volcano_type: r.fields.volcano_type }),
+    read: 'Holocene volcanoes whose last known eruption is in or after erupted_since (default 1900), from the Volcanoes of the World database; continuing=true keeps those GVP lists as erupting now. The US layer volcanoes carries USGS alert levels; this one has no alert levels.' },
 };

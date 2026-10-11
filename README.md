@@ -129,7 +129,7 @@ is not republishing, so the gate doesn't apply there.
 | `emsc` | EMSC-CSEM earthquakes worldwide, densest over Europe (CC BY 4.0), by window and magnitude floor | — |
 | `noaa-ibtracs` | the latest best-track fix of every active tropical cyclone, any basin | — |
 | `eurostat` | industrial production by country (index or year-on-year), latest month, at the capital | — |
-| `wri-gppd` | WRI Global Power Plant Database (CC BY 4.0, static June 2021), plants of 50 MW and up, by country and fuel | — |
+| `gem-trackers` | Global Energy Monitor Global Integrated Power Tracker (CC BY 4.0, 2026-08 release): plants of 50 MW and up, operating or under construction, by country, fuel and status (replaces the WRI database, static since 2021) | — |
 | `openfema` | FEMA disaster declarations of the last 90 days, at the county (or state) point | — |
 | `usda-ams-barge` | weekly downbound grain tonnage at seven Mississippi, Illinois, Ohio and Arkansas River locks (USDA AMS, from USACE LPMS) | — |
 | `bts-border-crossings` | inbound trucks, trains and vehicles per US-Canada and US-Mexico port of entry, latest month | — |
@@ -142,6 +142,9 @@ is not republishing, so the gate doesn't apply there.
 | `open-meteo` | daily weather, 92 days back and 7 forward, anywhere | — (non-commercial) |
 | `waterfowl-wsi` | the duck Weather Severity Index (Schummer et al. 2010) from Open-Meteo | — (non-commercial) |
 | `ebird` | waterfowl reported in an eBird region in the last 7 days | `EBIRD_API_KEY` (free, non-commercial) |
+| `open-meteo-flood` | GloFAS river discharge today at about a hundred large-river locations worldwide, with the week's change and the 30-day ensemble high | — (non-commercial) |
+| `open-meteo-air` | CAMS modelled air quality now at 150 large cities: US AQI, European AQI, PM2.5, PM10 | — (non-commercial) |
+| `smithsonian-gvp` | Smithsonian Volcanoes of the World: volcanoes erupting since 1900 worldwide, and those erupting now | — (non-commercial) |
 
 The rest of the catalogue is listed but not fetched yet. Adding a fetcher is the most useful
 contribution; see [CONTRIBUTING.md](CONTRIBUTING.md).
