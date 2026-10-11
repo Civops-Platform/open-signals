@@ -23,6 +23,7 @@ const TTL_MIN = {
   glerl: 360, ebird: 120, 'usda-nass': 360, 'usgs-earthquakes': 2,
   'usgs-volcanoes': 10, 'noaa-nwps': 15, 'epa-echo': 720, 'openfda-recalls': 360, usaspending: 360, gbif: 60, 'nasa-eonet': 30, 'world-bank': 1440,
   emsc: 2, 'noaa-ibtracs': 60, eurostat: 720, 'wri-gppd': 1440, openfema: 60,
+  'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -239,4 +240,17 @@ export const LAYERS = {
     read: 'One point per declared county (its Census internal point), or a state point for statewide and tribal declarations. Value 3 major disaster, 2 emergency, 1 fire management. Uses the OpenFEMA API; not endorsed by FEMA.' },
   earthquakes: { label: 'Earthquakes', source: 'usgs-earthquakes', metric: 'earthquake', unit: 'magnitude', value: valueOf, events: true,
     extra: (r) => ({ depth_km: r.fields.depth_km, alert: r.fields.alert, tsunami: r.fields.tsunami }), read: 'One point per event at its epicentre; window and min select the USGS feed.' },
+  // US freight and industrial emissions (src/fetchers/us-freight-emissions.js)
+  lock_traffic: { label: 'Grain barge tonnage through inland-waterway locks', source: 'usda-ams-barge', metric: 'lock_grain_tonnage', unit: 'tons/week', value: valueOf, events: true,
+    extra: (r) => ({ week_ending: r.fields.week_ending, corn: r.fields.corn, soybeans: r.fields.soybeans, wheat: r.fields.wheat, prior_4wk_avg_tons: r.fields.prior_4wk_avg_tons, river: r.fields.river }),
+    read: 'Downbound grain only (not all commodities), latest week, at the seven locks USDA AMS reports from the USACE Lock Performance Monitoring System. No delay or queue data: the live USACE lock pages are not a keyless feed.' },
+  border_crossings: { label: 'Border crossings by port of entry (BTS)', source: 'bts-border-crossings', metric: 'border_crossings', unit: 'trucks/month', value: valueOf, events: true,
+    extra: (r) => ({ month: r.fields.month, border: r.fields.border, trucks: r.fields.trucks ?? null, trains: r.fields.trains ?? null, personal_vehicles: r.fields.personal_vehicles ?? null }),
+    read: 'Inbound trucks in the latest month BTS has published, per US-Canada and US-Mexico port; border=canada|mexico narrows it. Container counts are no longer in the dataset.' },
+  toxic_releases: { label: 'Toxic releases by facility (EPA TRI)', source: 'epa-tri', metric: 'toxic_release', unit: 'lb on site/year', value: valueOf, events: true,
+    extra: (r) => ({ reporting_year: r.fields.reporting_year, industry_sector: r.fields.industry_sector, carcinogen_reported: r.fields.carcinogen_reported, dioxin_grams: r.fields.dioxin_grams }),
+    read: 'Total on-site releases of TRI chemicals in the latest published reporting year, one state (state=XX, default OH). Self-reported by facilities; a release is not a violation. Dioxins (grams) are listed apart, not summed with pounds.' },
+  power_emissions: { label: 'Power-plant emissions (EPA Clean Air Markets)', source: 'epa-campd', metric: 'power_emissions', unit: 'short tons CO2/month', value: valueOf, events: true,
+    extra: (r) => ({ month: r.fields.month, so2_tons: r.fields.so2_tons, nox_tons: r.fields.nox_tons, gross_load_mwh: r.fields.gross_load_mwh, primary_fuels: r.fields.primary_fuels }),
+    read: 'CO2, SO2 and NOx from the CAMPD daily bulk file, summed per facility over the latest month in it, one state (state=XX, default OH). EPA publishes the current year quarterly, so the latest month can be several months back.' },
 };

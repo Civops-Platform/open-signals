@@ -131,6 +131,10 @@ is not republishing, so the gate doesn't apply there.
 | `eurostat` | industrial production by country (index or year-on-year), latest month, at the capital | — |
 | `wri-gppd` | WRI Global Power Plant Database (CC BY 4.0, static June 2021), plants of 50 MW and up, by country and fuel | — |
 | `openfema` | FEMA disaster declarations of the last 90 days, at the county (or state) point | — |
+| `usda-ams-barge` | weekly downbound grain tonnage at seven Mississippi, Illinois, Ohio and Arkansas River locks (USDA AMS, from USACE LPMS) | — |
+| `bts-border-crossings` | inbound trucks, trains and vehicles per US-Canada and US-Mexico port of entry, latest month | — |
+| `epa-tri` | Toxics Release Inventory: on-site releases per facility in a state, latest reporting year | — |
+| `epa-campd` | power-plant CO2, SO2 and NOx per facility in a state, latest month in EPA's keyless bulk files | — |
 | `noaa-coops` | water levels at any CO-OPS station (LWD on the Great Lakes, MLLW on tidal stations) | — |
 | `usgs-water` | river discharge and gage height at any USGS gauge | — |
 | `glerl` | Great Lakes ice cover (December to May) | — |

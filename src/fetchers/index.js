@@ -23,8 +23,10 @@ import { emsc, ibtracs } from './world-hazards.js';
 import { eurostat } from './europe.js';
 import { wriPowerPlants } from './power-plants.js';
 import { openfema } from './fema.js';
+import { amsBargeLocks, btsBorderCrossings, epaTri, epaCampd } from './us-freight-emissions.js';
 
 export const FETCHERS = Object.fromEntries(
   [openMeteo, waterfowlWsi, coops, usgsWater, glerlIce, ebird, usdaNass, usgsEarthquakes, usgsVolcanoes, noaaNwps, epaEcho, openfdaRecalls, usaspendingAwards, gbif, nasaEonet, worldBank,
-    emsc, ibtracs, eurostat, wriPowerPlants, openfema].map((x) => [x.source, x]),
+    emsc, ibtracs, eurostat, wriPowerPlants, openfema,
+    amsBargeLocks, btsBorderCrossings, epaTri, epaCampd].map((x) => [x.source, x]),
 );
