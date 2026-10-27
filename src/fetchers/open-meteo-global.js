@@ -62,7 +62,7 @@ export const openMeteoFlood = {
       const ratio = med > 0 ? Math.round((q / med) * 100) / 100 : null;
       const change = weekAgo > 0 ? r1(((q - weekAgo) / weekAgo) * 100) : null;
       out.push(reading({
-        source, id: `${p.id}:${today}`, at: today, metric: 'river_discharge', place: p,
+        source, id: `${p.id}:${today}`, at: today, metric: 'river_discharge', place: p, basis: 'modelled',
         value: q, unit: 'm³/s',
         summary: `${p.name} ${today}: ${Math.round(q).toLocaleString('en-US')} m³/s`
           + (change != null ? `, ${change >= 0 ? '+' : ''}${change}% on a week ago` : '')
@@ -97,7 +97,7 @@ export const openMeteoAir = {
       const at = new Date(`${c.time}:00Z`).toISOString();
       const cat = usAqiCategory(c.us_aqi);
       out.push(reading({
-        source, id: `${p.id}:${at}`, at, metric: 'air_quality', place: p,
+        source, id: `${p.id}:${at}`, at, metric: 'air_quality', place: p, basis: 'modelled',
         value: c.us_aqi, unit: 'US AQI',
         summary: `${p.name} ${at.slice(0, 13).replace('T', ' ')}:00 UTC: US AQI ${c.us_aqi ?? '?'}${cat ? ` (${cat})` : ''}, PM2.5 ${r1(c.pm2_5) ?? '?'} µg/m³, PM10 ${r1(c.pm10) ?? '?'} µg/m³, European AQI ${c.european_aqi ?? '?'}`,
         fields: { us_aqi: c.us_aqi ?? null, us_aqi_category: cat, european_aqi: c.european_aqi ?? null, pm2_5_ugm3: c.pm2_5 ?? null, pm10_ugm3: c.pm10 ?? null,

@@ -144,7 +144,16 @@ is not republishing, so the gate doesn't apply there.
 | `ebird` | waterfowl reported in an eBird region in the last 7 days | `EBIRD_API_KEY` (free, non-commercial) |
 | `open-meteo-flood` | GloFAS river discharge today at about a hundred large-river locations worldwide, with the week's change and the 30-day ensemble high | — (non-commercial) |
 | `open-meteo-air` | CAMS modelled air quality now at 150 large cities: US AQI, European AQI, PM2.5, PM10 | — (non-commercial) |
+| `adsb-lol` | live aircraft from the adsb.lol receiver network (ODbL): around any point (`mode=area`), every military-flagged aircraft worldwide (`mode=military`), or GPS interference per 1° cell inferred from aircraft position accuracy (`mode=gps`, the GPSJam method). Aircraft in the FAA LADD and PIA privacy programmes are never served | — |
 | `smithsonian-gvp` | Smithsonian Volcanoes of the World: volcanoes erupting since 1900 worldwide, and those erupting now | — (non-commercial) |
+
+### Observed, modelled or derived
+
+A sensor reading and a conclusion drawn from it are not the same thing, so a reading says which it is.
+No `basis` means something observed it (a gauge, a seismometer, a receiver). `basis: "modelled"` is a
+model's output (Open-Meteo weather, GloFAS discharge, CAMS air quality). `basis: "derived"` is inferred
+from other readings and carries `derived_from` saying from what (GPS interference from aircraft NACp, the
+duck Weather Severity Index from modelled weather). Layer features always carry `basis`.
 
 The rest of the catalogue is listed but not fetched yet. Adding a fetcher is the most useful
 contribution; see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -156,6 +165,7 @@ contribution; see [CONTRIBUTING.md](CONTRIBUTING.md).
 - [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) (Bilawal Sidhu and Sameh Khamis)
 - [World Monitor](https://github.com/koala73/worldmonitor)
 - OSIRIS and WorldWideView
+- Shadowbroker, ULTOR and Gemini / Claude Earth (community builds on the God's Eye View recipe)
 - the official MCP Registry and awesome-mcp-servers
 - Source Cooperative, the AWS Open Data registry, Data.gov and public-apis
 

@@ -72,7 +72,7 @@ export const openMeteo = {
         const prev = days[i - 1];
         const pressureChange = prev?.pressure_hpa != null && day.pressure_hpa != null ? r1(day.pressure_hpa - prev.pressure_hpa) : null;
         out.push(reading({
-          source, id: `${p.id}:${day.date}`, at: day.date, metric: 'weather_daily', place: p, forecast,
+          source, id: `${p.id}:${day.date}`, at: day.date, metric: 'weather_daily', place: p, forecast, basis: 'modelled',
           value: day.temp_mean_c, unit: 'degC',
           summary: `${p.name} ${day.date}${forecast ? ' (forecast)' : ''}: mean ${r1(day.temp_mean_c)}°C, `
             + `wind ${r1(day.wind_max_kmh)} km/h from ${day.wind_dir_deg ?? '?'}°, pressure ${r1(day.pressure_hpa)} hPa`
@@ -104,6 +104,7 @@ export const waterfowlWsi = {
         const st = wsiStatus(w.wsi);
         out.push(reading({
           source, id: `${p.id}:${w.date}`, at: w.date, metric: 'waterfowl_wsi', place: p, forecast,
+          basis: 'derived', derivedFrom: 'Open-Meteo modelled daily temperature and snow (Schummer et al. 2010 formula)',
           value: w.wsi, unit: 'index',
           summary: `${p.name} ${w.date}${forecast ? ' (forecast)' : ''}: WSI ${w.wsi}`
             + (st.mallard_past_threshold ? ' — past the mallard threshold (7.2)'

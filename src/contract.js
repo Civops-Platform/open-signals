@@ -10,6 +10,8 @@
  *     summary:  one sentence a person can read
  *     place:    { id, name, lat, lng, state? } | null
  *     forecast: true only for a modelled future value
+ *     basis:    absent means a sensor or a person observed it; 'modelled' (a model's output, not a
+ *               measurement) or 'derived' (inferred from other readings, with derived_from saying what)
  *     fields:   anything else the upstream said, unrenamed where possible
  *     source:   { id, name, url, fetched_at, license }
  *   }
@@ -38,7 +40,10 @@ export function servable(license, env = process.env) {
   return false;
 }
 
-export function reading({ source, id, at, metric, value, unit, summary, place, forecast, fields, url, fetchedAt }) {
+// What a sensor recorded and what was inferred from it are kept apart on every reading.
+export const BASES = Object.freeze(['observed', 'modelled', 'derived']);
+
+export function reading({ source, id, at, metric, value, unit, summary, place, forecast, basis, derivedFrom, fields, url, fetchedAt }) {
   const v = value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   return {
     id: `${source.id}:${id}`,
@@ -50,6 +55,8 @@ export function reading({ source, id, at, metric, value, unit, summary, place, f
     // A place we cannot put on a map (an ad-hoc region code with no coordinates) is left off, not guessed.
     place: place && Number.isFinite(place.lat) && Number.isFinite(place.lng) ? placeRef(place) : null,
     ...(forecast ? { forecast: true } : {}),
+    ...(basis && basis !== 'observed' ? { basis } : {}),
+    ...(derivedFrom ? { derived_from: derivedFrom } : {}),
     fields: fields ?? {},
     source: { id: source.id, name: source.name, url: url ?? source.homepage ?? null, fetched_at: fetchedAt, license: source.license },
   };
@@ -65,6 +72,8 @@ export function validateReading(r) {
   if (r.value !== null && typeof r.value !== 'number') errs.push('value must be a number or null');
   if (!r.source?.id || !r.source?.name || !r.source?.fetched_at) errs.push('source.id, source.name and source.fetched_at are required');
   if (!LICENSES.includes(r.source?.license)) errs.push(`source.license must be one of ${LICENSES.join(', ')}`);
+  if (r.basis !== undefined && !BASES.includes(r.basis)) errs.push(`basis must be one of ${BASES.join(', ')}`);
+  if (r.basis === 'derived' && !r.derived_from) errs.push('a derived reading says what it was derived_from');
   if (r.place && !(Number.isFinite(r.place.lat) && Number.isFinite(r.place.lng))) errs.push('place needs numeric lat and lng');
   return errs;
 }

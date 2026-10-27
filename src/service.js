@@ -26,6 +26,7 @@ const TTL_MIN = {
   'gem-trackers': 1440, 'open-meteo-flood': 720, 'open-meteo-air': 180, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
   'usace-mvn-locks': 30, 'nrcs-snotel': 360, 'us-drought-monitor': 720, 'noaa-spc-reports': 10, 'nifc-wfigs': 15,
+  'adsb-lol': 2,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -39,6 +40,7 @@ const DEFAULT_PLACES = {
   // none from the catalogue: these read their own world lists (catalog/world-*.json) unless a caller names places
   'open-meteo-flood': () => [],
   'open-meteo-air': () => [],
+  'adsb-lol': () => [], // a named lat/lng, the worldwide military list, or (gps) the fetcher's watched regions
 };
 
 /**
@@ -147,18 +149,18 @@ export function createService({ fetch: fetchFn = globalThis.fetch, env = process
     if (!L) throw new HttpError(404, `unknown layer '${id}'`, { layers: Object.keys(LAYERS) });
     const date = q.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now());
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'date must be YYYY-MM-DD');
-    const r = await run(L.source, q, opts);
+    const r = await run(L.source, { ...q, ...(L.q || {}) }, opts);
     const rs = r.readings.filter((x) => (!L.metric || x.metric === L.metric) && x.place); // no metric: the source's one series (e.g. the chosen indicator)
     const s = catalogSource(L.source);
     const base = { type: 'FeatureCollection', layer: id, label: L.label, unit: L.unit, ...(L.read ? { read: L.read } : {}), status: r.status,
       source: { id: s.id, name: s.name, license: s.license, ...(s.attribution ? { attribution: s.attribution } : {}) } };
     if (L.events) {
-      return { ...base, features: rs.map((x) => feature(x.place, { id: x.id, at: x.at, value: L.value(x), summary: x.summary, url: x.source.url, ...(L.extra ? L.extra(x) : {}) })) };
+      return { ...base, features: rs.map((x) => feature(x.place, { id: x.id, at: x.at, value: L.value(x), summary: x.summary, url: x.source.url, ...basisOf(x), ...(L.extra ? L.extra(x) : {}) })) };
     }
     const features = [];
     for (const [, group] of pickPerPlace(rs, date)) {
       const r0 = group[0];
-      const props = { place: r0.place.id, name: r0.place.name, date: r0.at.slice(0, 10), forecast: !!r0.forecast, url: r0.source.url, fetched_at: r0.source.fetched_at };
+      const props = { place: r0.place.id, name: r0.place.name, date: r0.at.slice(0, 10), forecast: !!r0.forecast, ...basisOf(r0), url: r0.source.url, fetched_at: r0.source.fetched_at };
       if (L.group) {
         props.items = group.map((x) => ({ label: x.fields.common_name ?? x.summary, value: L.value(x), summary: x.summary })).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
         props.value = props.items.length;
@@ -204,6 +206,7 @@ export function pickPerPlace(rs, date) {
 }
 
 const valueOf = (r) => r.value;
+const basisOf = (r) => ({ basis: r.basis || 'observed', ...(r.derived_from ? { derived_from: r.derived_from } : {}) });
 const field = (k) => (r) => (Number.isFinite(Number(r.fields?.[k])) && r.fields?.[k] !== null ? Number(r.fields[k]) : null);
 
 export const LAYERS = {
@@ -295,4 +298,14 @@ export const LAYERS = {
   wildfire_incidents: { label: 'Wildfires burning now (NIFC WFIGS)', source: 'nifc-wfigs', metric: 'wildfire_incident', unit: 'acres', value: valueOf, events: true,
     extra: (r) => ({ percent_contained: r.fields.percent_contained, discovered: r.fields.discovered, cause: r.fields.cause, gacc: r.fields.gacc, personnel: r.fields.personnel }),
     read: 'Every wildfire incident in IRWIN not yet declared contained, controlled or out, at its point of origin; small fires drop off after a few days without an update. kind=prescribed|all adds prescribed fires.' },
+  // Live air traffic and what it reveals (src/fetchers/flights.js)
+  aircraft: { label: 'Aircraft now (adsb.lol)', source: 'adsb-lol', metric: 'aircraft', unit: 'ft', value: valueOf, events: true, q: { mode: 'area' },
+    extra: (r) => ({ callsign: r.fields.callsign, registration: r.fields.registration, type: r.fields.type, military: r.fields.military, ground_speed_kt: r.fields.ground_speed_kt, track_deg: r.fields.track_deg, squawk: r.fields.squawk }),
+    read: 'Every aircraft heard by the adsb.lol receiver network within radius= nautical miles (default 100, max 250) of lat=/lng=. Value is barometric altitude, 0 on the ground. Coverage is wherever volunteers run receivers. Aircraft enrolled in the FAA LADD or PIA privacy programmes are never served.' },
+  military_aircraft: { label: 'Military aircraft worldwide (adsb.lol)', source: 'adsb-lol', metric: 'aircraft', unit: 'ft', value: valueOf, events: true, q: { mode: 'military' },
+    extra: (r) => ({ callsign: r.fields.callsign, registration: r.fields.registration, type: r.fields.type, ground_speed_kt: r.fields.ground_speed_kt, track_deg: r.fields.track_deg, squawk: r.fields.squawk }),
+    read: 'Every aircraft the readsb database flags as military that a receiver hears right now, worldwide. Only aircraft transmitting ADS-B or seen by MLAT appear; most military flights do not broadcast, so absence means nothing.' },
+  gps_interference: { label: 'GPS interference, inferred from aircraft (adsb.lol)', source: 'adsb-lol', metric: 'gps_interference', unit: '% of aircraft degraded', value: valueOf, events: true, q: { mode: 'gps' },
+    extra: (r) => ({ level: r.fields.level, aircraft: r.fields.aircraft, degraded: r.fields.degraded }),
+    read: 'Derived, not measured. Per 1° cell, the share of airborne aircraft (ADS-B v1+) reporting position accuracy NACp below 8, the GPSJam method; cells with fewer than 5 such aircraft are left out. Under 2% low, 2-10% medium, over 10% high; a cell with only one degraded aircraft stays low. Default looks at five regions (Baltic, Eastern Mediterranean, Persian Gulf, Red Sea, and the US Great Lakes as a quiet control) within radius= nm (default 250); lat=/lng= looks anywhere else. Avionics faults also lower NACp, so one cell on its own is a lead, not a finding.' },
 };

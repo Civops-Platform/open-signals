@@ -15,9 +15,12 @@ let failed = 0;
 const say = (ok, msg) => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${msg}`); };
 const svc = createService();
 
+// Sources that need a query to answer at all: the default is a sensible one, not an empty one.
+const LIVE_Q = { 'adsb-lol': { mode: 'military' } };
+
 for (const id of Object.keys(FETCHERS)) {
   try {
-    const r = await svc.readings(id, {}, { mode: 'local' });
+    const r = await svc.readings(id, LIVE_Q[id] || {}, { mode: 'local' });
     const bad = r.readings.flatMap(validateReading);
     const ok = (r.status === 'ok' && r.count > 0 && !bad.length) || r.status === 'off_season' || r.status === 'not_configured';
     say(ok, `${id}: ${r.status}${r.detail ? ` (${r.detail})` : ''}, ${r.count} readings${bad.length ? `, invalid: ${bad[0]}` : ''}${r.readings[0] ? `\n      e.g. ${r.readings[0].summary}` : ''}`);
@@ -39,6 +42,12 @@ try {
     const r = await fetch(`${base}/v1/layers/${id}`);
     const j = await r.json();
     say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${id} → ${r.status}, ${j.features?.length} features${j.error ? ` (${j.error})` : ''}`);
+  }
+  for (const path of ['military_aircraft', 'gps_interference', 'aircraft?lat=41.41&lng=-81.85&radius=60']) {
+    const r = await fetch(`${base}/v1/layers/${path}`);
+    const j = await r.json();
+    const basis = j.features?.[0]?.properties?.basis;
+    say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${path} → ${r.status}, ${j.features?.length} features, basis ${basis}${j.error ? ` (${j.error})` : ''}`);
   }
   for (const id of ['river_discharge', 'air_quality', 'volcanoes_world']) {
     const r = await fetch(`${base}/v1/layers/${id}`);
