@@ -34,8 +34,11 @@ async function ask(q) {
       try {
         const r = await fetch(u, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(q)}`, signal: AbortSignal.timeout(300000) });
         const t = await r.text();
-        if (r.ok && t.startsWith('{')) return JSON.parse(t);
-        console.error(`${u}: ${r.status}`);
+        // A query that runs out of time still answers 200, with what it had and a "runtime error" remark:
+        // a short tile, not a failure, unless it is caught here.
+        const j = r.ok && t.startsWith('{') ? JSON.parse(t) : null;
+        if (j && !/error/i.test(j.remark || '')) return j;
+        console.error(`${u}: ${r.status}${j?.remark ? ` (${j.remark.slice(0, 120)})` : ''}`);
       } catch (e) { console.error(`${u}: ${e.message}`); }
     }
     await new Promise((ok) => setTimeout(ok, 30000 * (round + 1)));
