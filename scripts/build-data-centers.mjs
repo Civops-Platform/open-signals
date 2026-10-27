@@ -7,7 +7,7 @@
  *   node scripts/build-data-centers.mjs dump.json            # or reads a saved Overpass answer
  *   node scripts/build-data-centers.mjs --out /data/x.json   # writes elsewhere (the weekly rebuild on a server)
  *
- * The worldwide query takes about three minutes, too long to run per request, so the table is built ahead
+ * The query, in eight tiles because the public mirrors refuse one worldwide query on a busy day, takes 10 to 40 minutes, too long to run per request, so the table is built ahead
  * and rebuilt on a schedule. OpenStreetMap data is ODbL 1.0: this file is a derived database and is offered
  * under ODbL 1.0 too, © OpenStreetMap contributors. Operator names are normalised for the common spellings
  * (AWS, Amazon Web Services) and kept as written in `operator_raw`.
@@ -16,7 +16,9 @@
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 const MIRRORS = ['https://overpass.private.coffee/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-const QUERY = '[out:json][timeout:300];(nwr["telecom"="data_center"];nwr["building"="data_center"];nwr["construction"="data_center"];);out center tags;';
+// The world in tiles: one worldwide query is heavy enough that the public mirrors answer 502/504 on a busy day.
+const TILES = [[-60, -180, 85, -100], [-60, -100, 85, -80], [-60, -80, 85, -40], [-60, -40, 85, 0], [-60, 0, 85, 15], [-60, 15, 85, 40], [-60, 40, 85, 100], [-60, 100, 85, 180]];
+const query = ([s, w, n, e]) => `[out:json][timeout:240][bbox:${s},${w},${n},${e}];(nwr["telecom"="data_center"];nwr["building"="data_center"];nwr["construction"="data_center"];);out center tags;`;
 const UA = 'open-signals (+https://github.com/Civops-Platform/open-signals)';
 const OPERATORS = [
   [/^(aws|amazon( web services)?|amazon data services)/i, 'Amazon Web Services'], [/^microsoft/i, 'Microsoft'], [/^google/i, 'Google'], [/^(meta|facebook)/i, 'Meta'],
@@ -26,16 +28,30 @@ const OPERATORS = [
 ];
 const norm = (s) => { if (!s) return null; for (const [re, n] of OPERATORS) if (re.test(s.trim())) return n; return s.trim(); };
 
-async function overpass() {
-  for (const u of MIRRORS) {
-    try {
-      const r = await fetch(u, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(QUERY)}`, signal: AbortSignal.timeout(360000) });
-      const t = await r.text();
-      if (r.ok && t.startsWith('{')) return t;
-      console.error(`${u}: ${r.status}`);
-    } catch (e) { console.error(`${u}: ${e.message}`); }
+async function ask(q) {
+  for (let round = 0; round < 3; round++) {
+    for (const u of MIRRORS) {
+      try {
+        const r = await fetch(u, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(q)}`, signal: AbortSignal.timeout(300000) });
+        const t = await r.text();
+        if (r.ok && t.startsWith('{')) return JSON.parse(t);
+        console.error(`${u}: ${r.status}`);
+      } catch (e) { console.error(`${u}: ${e.message}`); }
+    }
+    await new Promise((ok) => setTimeout(ok, 30000 * (round + 1)));
   }
   throw new Error('no Overpass mirror answered');
+}
+
+/** Every tile, one at a time, merged and de-duplicated (a way on a tile edge comes back twice). */
+async function overpass() {
+  const seen = new Map();
+  for (const t of TILES) {
+    const d = await ask(query(t));
+    for (const e of d.elements || []) seen.set(`${e.type}/${e.id}`, e);
+    console.error(`tile ${t.join(',')}: ${(d.elements || []).length}`);
+  }
+  return JSON.stringify({ elements: [...seen.values()] });
 }
 
 const args = process.argv.slice(2);
