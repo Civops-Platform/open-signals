@@ -16,7 +16,7 @@ const say = (ok, msg) => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL
 const svc = createService();
 
 // Sources that need a query to answer at all: the default is a sensible one, not an empty one.
-const LIVE_Q = { 'adsb-lol': { mode: 'military' } };
+const LIVE_Q = { 'adsb-lol': { mode: 'military' }, 'sec-filings': { days: '7' } };
 
 for (const id of Object.keys(FETCHERS)) {
   try {
@@ -43,7 +43,7 @@ try {
     const j = await r.json();
     say(r.status === 200 && j.features?.length > 0, `GET /v1/layers/${id} → ${r.status}, ${j.features?.length} features${j.error ? ` (${j.error})` : ''}`);
   }
-  for (const path of ['military_aircraft', 'gps_interference', 'fires?bbox=-125,24,-66,50', 'persistent_heat', 'steel_plant_heat', 'cement_plant_heat', 'chemical_plant_heat', 'oil_gas_field_heat', 'weather_alerts?marine=true', 'reservoirs_west', 'quake_corroboration', 'fire_corroboration', 'ships_baltic', 'aircraft?lat=41.41&lng=-81.85&radius=60']) {
+  for (const path of ['military_aircraft', 'gps_interference', 'fires?bbox=-125,24,-66,50', 'persistent_heat', 'steel_plant_heat', 'cement_plant_heat', 'chemical_plant_heat', 'oil_gas_field_heat', 'weather_alerts?marine=true', 'reservoirs_west', 'quake_corroboration', 'fire_corroboration', 'ships_baltic', 'data_centers?status=construction', 'aircraft?lat=41.41&lng=-81.85&radius=60']) {
     const r = await fetch(`${base}/v1/layers/${path}`);
     const j = await r.json();
     const basis = j.features?.[0]?.properties?.basis;

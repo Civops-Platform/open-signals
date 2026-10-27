@@ -32,6 +32,8 @@ import { nwsAlerts } from './nws-alerts.js';
 import { usbrRise } from './usbr-rise.js';
 import { corroboration } from './corroborate.js';
 import { digitrafficAis } from './digitraffic.js';
+import { osmDataCenters } from './data-centers.js';
+import { secFilings } from './sec-filings.js';
 import { usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs } from './us-water-hazards.js';
 
 export const FETCHERS = Object.fromEntries(
@@ -40,5 +42,5 @@ export const FETCHERS = Object.fromEntries(
     openMeteoFlood, openMeteoAir, smithsonianVolcanoes,
     amsBargeLocks, btsBorderCrossings, epaTri, epaCampd,
     usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs,
-    adsbLol, nasaFirms, nwsAlerts, usbrRise, corroboration, digitrafficAis].map((x) => [x.source, x]),
+    adsbLol, nasaFirms, nwsAlerts, usbrRise, corroboration, digitrafficAis, osmDataCenters, secFilings].map((x) => [x.source, x]),
 );

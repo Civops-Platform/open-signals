@@ -26,7 +26,7 @@ const TTL_MIN = {
   'gem-trackers': 1440, 'open-meteo-flood': 720, 'open-meteo-air': 180, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
   'usace-mvn-locks': 30, 'nrcs-snotel': 360, 'us-drought-monitor': 720, 'noaa-spc-reports': 10, 'nifc-wfigs': 15,
-  'adsb-lol': 2, 'nasa-firms': 30, 'nws-alerts': 5, 'usbr-rise': 360, corroboration: 10, 'digitraffic-ais': 1,
+  'adsb-lol': 2, 'nasa-firms': 30, 'nws-alerts': 5, 'usbr-rise': 360, corroboration: 10, 'digitraffic-ais': 1, 'osm-data-centers': 1440, 'sec-filings': 60,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -317,6 +317,9 @@ export const LAYERS = {
   ships_baltic: { label: 'Ships, Finnish waters and northern Baltic (Digitraffic AIS)', source: 'digitraffic-ais', metric: 'ship', unit: 'knots', value: valueOf, events: true,
     extra: (r) => ({ kind: r.fields.kind, destination: r.fields.destination, nav_status: r.fields.nav_status, course_deg: r.fields.course_deg, imo: r.fields.imo }),
     read: 'Live AIS positions from Finland\'s coastal receivers: the Gulf of Finland, Archipelago Sea, Gulf of Bothnia and nearby Baltic, not the open ocean. Value is speed over ground. type=cargo|tanker|passenger|fishing|tug|other narrows it. Pleasure and sailing craft are not served. The only open (CC BY) AIS feed found; global AIS needs a key.' },
+  data_centers: { label: 'Data centers (OpenStreetMap)', source: 'osm-data-centers', metric: 'data_center', unit: 'site', value: valueOf, events: true,
+    extra: (r) => ({ operator: r.fields.operator, status: r.fields.status, country: r.fields.country, start_date: r.fields.start_date }),
+    read: 'Every data center mapped in OpenStreetMap (about 4,700 worldwide, 1,800 in the US), with the operator where tagged: AWS, Equinix, Digital Realty, Microsoft, Google, Meta and others. operator=, status=operating|construction and bbox= narrow it. Volunteer-mapped: big North American and European campuses are well covered, newer and smaller sites less so, and a site under construction shows only once someone maps it. © OpenStreetMap contributors, ODbL.' },
   // Two sources on one event (src/fetchers/corroborate.js)
   quake_corroboration: { label: 'Earthquakes: do USGS and EMSC agree?', source: 'corroboration', metric: 'earthquake_corroboration', unit: 'agencies reporting', value: valueOf, events: true, q: { mode: 'earthquakes' },
     extra: (r) => ({ corroborated: r.fields.corroborated, relayed: r.fields.relayed, emsc_agency: r.fields.emsc_agency, mag_usgs: r.fields.mag_usgs, mag_emsc: r.fields.mag_emsc, mag_gap: r.fields.mag_gap, distance_km: r.fields.distance_km }),

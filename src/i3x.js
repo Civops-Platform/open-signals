@@ -71,6 +71,7 @@ export const I3X_LAYERS = {
   quake_corroboration: { q: { window: 'day' } },
   fire_corroboration: {},
   ships_baltic: {},
+  data_centers: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');
