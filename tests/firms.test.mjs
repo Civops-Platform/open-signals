@@ -2,7 +2,7 @@
 // and the committed GEM steel table. No network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nasaFirms, steelPlants, nearestSteelPlant, MAX_FIRES } from '../src/fetchers/firms.js';
+import { nasaFirms, steelPlants, nearestSteelPlant, nearestFacility, facilities, FACILITY_KINDS, MAX_FIRES } from '../src/fetchers/firms.js';
 import { validateReading, servable } from '../src/contract.js';
 import { createService, LAYERS } from '../src/service.js';
 import { I3X_LAYERS } from '../src/i3x.js';
@@ -32,7 +32,7 @@ test('steel table: GEM plants with owners, no shareholder placeholders, position
   const { all, hot, release } = steelPlants();
   assert.match(release, /^\d{4}-\d{2}$/);
   assert.ok(all.length > 900, `${all.length} plants`);
-  assert.ok(hot.length > 400 && hot.every((p) => /BF|DRI/.test(p.prod_type)));
+  assert.ok(hot.length > 400 && hot.every((p) => /BF|DRI/.test(p.kind_detail)));
   assert.ok(all.every((p) => Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180));
   assert.ok(!all.some((p) => /natural person|unknown|small shareholder/i.test(`${p.owner} ${p.parent}`)), 'no placeholder shareholders');
   const gary = nearestSteelPlant(GARY);
@@ -98,4 +98,48 @@ test('layers: fires observed, steel heat derived, attribution travels', async ()
   const g = steel.features.find((x) => x.properties.place_ref.name === 'U.S. Steel Gary Works');
   assert.equal(g.properties.basis, 'derived');
   assert.equal(g.properties.owner, 'United States Steel Corp');
+});
+
+test('facility tables: four GEM trackers, owners kept, placeholders dropped, hot sites only where heat shows', () => {
+  for (const kind of FACILITY_KINDS) {
+    const t = facilities(kind);
+    assert.ok(t.hot.length > 400, `${kind}: ${t.hot.length} hot sites`);
+    assert.ok(t.radius_km >= 3 && t.capacity_unit && t.tracker && t.release, kind);
+    assert.ok(!t.all.some((p) => /natural person|small shareholder/i.test(`${p.owner} ${p.parent}`)), `${kind}: no placeholder shareholders`);
+    assert.equal(new Set(t.all.map((p) => p.project_id)).size, t.all.length, `${kind}: ids unique`);
+  }
+  assert.ok(facilities('cement').hot.every((p) => ['integrated', 'clinker only'].includes(p.kind_detail)), 'grinding plants have no kiln');
+  assert.equal(facilities('oil_gas').radius_km, 10, 'fields are wide areas placed at one point');
+});
+
+test('cement, chemicals, oil_gas modes: heat days per site with owner, steel keeps the field names Genome reads', async () => {
+  const kiln = facilities('cement').hot.find((p) => p.location_exact && p.parent);
+  const field = facilities('oil_gas').hot.find((p) => p.location_exact);
+  const near = (p, dLng) => DATES.slice(0, 4).map((d) => row(p.lat, p.lng + dLng, d, 9));
+  const f = stubFetch([[/SUOMI_VIIRS_C2_Global_7d\.csv$/, res(200, csv([...near(kiln, 0.01), ...near(field, 0.08), ...DATES.map((d) => row(GARY.lat, GARY.lng, d, 20))]))]]);
+  const cem = (await nasaFirms.fetch(ctx(f, { params: { mode: 'cement' } }))).readings;
+  const k = cem.find((x) => x.fields.gem_project_id === kiln.project_id);
+  assert.deepEqual([k.metric, k.value, k.fields.kind, k.fields.parent], ['cement_plant_heat', 4, 'cement', kiln.parent]);
+  valid(cem.slice(0, 20));
+  const og = (await nasaFirms.fetch(ctx(f, { params: { mode: 'oil_gas' } }))).readings.find((x) => x.fields.gem_project_id === field.project_id);
+  assert.equal(og.value, 4, 'about 7 km off the field point still counts at a 10 km radius');
+  assert.equal(og.metric, 'oil_gas_field_heat');
+  const steel = (await nasaFirms.fetch(ctx(f, { params: { mode: 'steel' } }))).readings.find((x) => x.place.name === 'U.S. Steel Gary Works');
+  assert.ok(steel.fields.prod_type && Number.isFinite(steel.fields.capacity_kt), 'prod_type and capacity_kt stay');
+  assert.ok((await nasaFirms.fetch(ctx(f, { params: { mode: 'chemicals' } }))).readings.length > 400);
+});
+
+test('persistent heat names the nearest site of any kind', () => {
+  assert.equal(nearestFacility(GARY).name, 'U.S. Steel Gary Works');
+  const kiln = facilities('cement').hot.find((p) => p.location_exact);
+  assert.equal(nearestFacility({ lat: kiln.lat + 0.001, lng: kiln.lng }).kind, 'cement');
+});
+
+test('summary names the parent only when it is a different company', async () => {
+  const self = facilities('cement').hot.find((p) => p.owner && p.parent && p.owner.replace(/\s*\[[^\]]*\]/g, '') === p.parent.replace(/\s*\[[^\]]*\]/g, ''));
+  const f = stubFetch([[/SUOMI_VIIRS_C2_Global_7d\.csv$/, res(200, csv([row(1, 1, DATES[0], 1)]))]]);
+  const r = (await nasaFirms.fetch(ctx(f, { params: { mode: 'cement' } }))).readings.find((x) => x.fields.gem_project_id === self.project_id);
+  assert.doesNotMatch(r.summary, /parent/);
+  const gary = (await nasaFirms.fetch(ctx(f, { params: { mode: 'steel' } }))).readings.find((x) => x.place.name === 'U.S. Steel Gary Works');
+  assert.match(gary.summary, /parent Nippon Steel/);
 });

@@ -3,17 +3,20 @@
  * global CSV files (no MAP_KEY needed for these). NASA data are CC0; cite "NASA FIRMS".
  * https://www.earthdata.nasa.gov/data/tools/firms/faq
  *
- *   params.mode  fires (default) | persistent | steel
+ *   params.mode  fires (default) | persistent | steel | cement | chemicals | oil_gas
  *     fires       every detection of the last 24 hours (NOAA-20), nominal or high confidence, inside
  *                 params.bbox (default the whole world); at most MAX_FIRES, the strongest kept
  *     persistent  ~1 km cells with heat on PERSISTENT_DAYS or more of the last seven days (Suomi NPP). A
  *                 vegetation fire moves on within days; heat that stays put is usually an industrial
  *                 source (steel, cement, refinery), a gas flare or a volcano. Each cell names the nearest
  *                 steel plant and thermal power plant in Global Energy Monitor's trackers within NEAR_KM.
- *     steel       every blast-furnace or DRI steel plant in GEM's Global Iron and Steel Tracker (operating,
- *                 pre-retirement, mothballed or building), with the days of the last seven that VIIRS saw
- *                 heat within NEAR_KM of it, and its owner and parent company. Electric-arc mini-mills are
- *                 left out: they run too cool to show reliably, so a zero would say nothing.
+ *     steel, cement, chemicals, oil_gas
+ *                 every site in a Global Energy Monitor tracker (catalog/facilities/<kind>.json, built by
+ *                 scripts/build-facilities.mjs) that makes heat a satellite can see: blast-furnace and DRI
+ *                 steel plants, clinker kilns, chemical plants, oil and gas fields (flaring). Each with the days
+ *                 of the last seven that VIIRS saw heat within the kind's radius (3 km; 10 km for fields, which
+ *                 GEM places at one point of a wide area), and its owner and parent company. Electric-arc
+ *                 mills and cement grinding plants are left out: they run too cool to show, so a zero would say nothing.
  *   params.bbox  xmin,ymin,xmax,ymax
  *
  * FIRMS's own static-source classification is not distributed, so "persistent" is worked out here, from
@@ -25,7 +28,8 @@ import { getText } from './http.js';
 import { readFileSync } from 'node:fs';
 import { powerPlantTable } from './power-plants.js';
 
-const MODES = ['fires', 'persistent', 'steel'];
+export const FACILITY_KINDS = ['steel', 'cement', 'chemicals', 'oil_gas'];
+const MODES = ['fires', 'persistent', ...FACILITY_KINDS];
 const FIRES_24H = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv';
 const SNPP_7D = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_7d.csv';
 export const MAX_FIRES = 5000;
@@ -82,15 +86,16 @@ function thermalPlants() {
   return (plantGrid = gridOf(items));
 }
 
-let steel = null;
-/** GEM iron and steel plants (catalog/steel-plants.json, built by scripts/build-steel-plants.mjs). */
-export function steelPlants() {
-  if (steel) return steel;
-  const t = JSON.parse(readFileSync(new URL('../../catalog/steel-plants.json', import.meta.url), 'utf8'));
+const tables = {};
+/** A GEM facility table (catalog/facilities/<kind>.json): every site, the hot ones, and a grid of exactly placed ones. */
+export function facilities(kind) {
+  if (tables[kind]) return tables[kind];
+  const t = JSON.parse(readFileSync(new URL(`../../catalog/facilities/${kind}.json`, import.meta.url), 'utf8'));
   const ix = Object.fromEntries(t.fields.map((k, i) => [k, i]));
-  const all = t.plants.map((p) => Object.assign(Object.fromEntries(t.fields.map((k) => [k, p[ix[k]]])), { url: p[ix.wiki] ? `${t.wiki}${p[ix.wiki]}` : t.source }));
-  return (steel = { release: t.release, all, hot: all.filter((p) => /BF|DRI/.test(p.prod_type || '')), grid: gridOf(all.filter((p) => p.location_exact)) });
+  const all = t.sites.map((p) => Object.assign(Object.fromEntries(t.fields.map((k) => [k, p[ix[k]]])), { kind, url: p[ix.wiki] ? `${t.wiki}${p[ix.wiki]}` : t.source }));
+  return (tables[kind] = { ...t, all, hot: all.filter((p) => p.hot), grid: gridOf(all.filter((p) => p.location_exact && p.hot)) });
 }
+export const steelPlants = () => facilities('steel');
 
 const km = (a, b) => {
   const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
@@ -98,19 +103,25 @@ const km = (a, b) => {
   return 6371 * 2 * Math.asin(Math.sqrt(h));
 };
 
-function nearest(grid, pt) {
+function nearest(grid, pt, within = NEAR_KM) {
   let best = null;
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     for (const p of grid.get(`${Math.floor(pt.lat) + dy}_${Math.floor(pt.lng) + dx}`) || []) {
       const d = km(pt, p);
-      if (d <= NEAR_KM && (!best || d < best.km)) best = { ...p, km: Math.round(d * 10) / 10 };
+      if (d <= within && (!best || d < best.km)) best = { ...p, km: Math.round(d * 10) / 10 };
     }
   }
   return best;
 }
 
 export const nearestThermalPlant = (pt) => nearest(thermalPlants(), pt);
-export const nearestSteelPlant = (pt) => nearest(steelPlants().grid, pt);
+export const nearestSteelPlant = (pt) => nearest(facilities('steel').grid, pt);
+/** The nearest industrial site of any kind: a plant within its radius first, then an oil or gas field. */
+export function nearestFacility(pt) {
+  const plants = ['steel', 'cement', 'chemicals'].map((k) => nearest(facilities(k).grid, pt, facilities(k).radius_km)).filter(Boolean).sort((a, b) => a.km - b.km);
+  return plants[0] || nearest(facilities('oil_gas').grid, pt, facilities('oil_gas').radius_km);
+}
+const KIND_WORD = { steel: 'steel', cement: 'cement', chemicals: 'chemicals', oil_gas: 'oil and gas field' };
 
 /**
  * Seven days of Suomi NPP detections, nominal or high confidence, inside the box. The file is a rolling
@@ -161,7 +172,7 @@ export const nasaFirms = {
     }
 
     const dets = await week(f, b);
-    if (mode === 'steel') return { status: 'ok', readings: steelActivity(dets, { source, fetchedAt, now }) };
+    if (FACILITY_KINDS.includes(mode)) return { status: 'ok', readings: facilityHeat(mode, dets, { source, fetchedAt, now }) };
     const span = dets.span;
     const cells = new Map();
     for (const d of dets) {
@@ -176,18 +187,20 @@ export const nasaFirms = {
       if (c.days.size < PERSISTENT_DAYS) continue;
       const pt = { lat: Math.round((c.lat / c.n) * 1e4) / 1e4, lng: Math.round((c.lng / c.n) * 1e4) / 1e4 };
       const plant = nearestThermalPlant(pt);
-      const mill = nearestSteelPlant(pt);
+      const site = nearestFacility(pt);
+      const mill = site?.kind === 'steel' ? site : null;
       out.push(reading({
         source, id: `persistent:${key}:${c.last.slice(0, 10)}`, at: c.last, metric: 'persistent_heat',
-        place: { id: `heat-${key}`, name: mill ? `near ${mill.name}` : plant ? `near ${plant.name}` : `${pt.lat.toFixed(3)}, ${pt.lng.toFixed(3)}`, ...pt },
+        place: { id: `heat-${key}`, name: site ? `near ${site.name}` : plant ? `near ${plant.name}` : `${pt.lat.toFixed(3)}, ${pt.lng.toFixed(3)}`, ...pt },
         value: c.days.size, unit: 'UTC dates with heat',
         summary: `Heat on ${c.days.size} of the last ${span} UTC dates (${c.n} detections, mean ${Math.round(c.frp / c.n)} MW)`
-          + (mill ? `, ${mill.km} km from ${mill.name} (steel${mill.owner ? `, ${mill.owner}` : ''})` : plant ? `, ${plant.km} km from ${plant.name} (${plant.fuels.join(' + ')}, ${plant.mw} MW)` : '')
+          + (site ? `, ${site.km} km from ${site.name} (${KIND_WORD[site.kind]}${site.owner ? `, ${site.owner}` : ''})` : plant ? `, ${plant.km} km from ${plant.name} (${plant.fuels.join(' + ')}, ${plant.mw} MW)` : '')
           + ': likely an industrial source, gas flare or volcano rather than a wildfire',
         basis: 'derived', derivedFrom: `NASA FIRMS VIIRS (Suomi NPP) detections, ${c.n} in this ~1 km cell over 7 days`,
         fields: { days: c.days.size, of_days: span, detections: c.n, mean_frp_mw: Math.round((c.frp / c.n) * 10) / 10, max_frp_mw: c.maxFrp, last_seen: c.last,
           near_plant: plant ? { gem_project_id: plant.id, name: plant.name, fuels: plant.fuels, capacity_mw: plant.mw, km: plant.km } : null,
-          near_steel_plant: mill ? { gem_project_id: mill.project_id, name: mill.name, owner: mill.owner, parent: mill.parent, km: mill.km } : null },
+          near_steel_plant: mill ? { gem_project_id: mill.project_id, name: mill.name, owner: mill.owner, parent: mill.parent, km: mill.km } : null,
+          near_facility: site ? { kind: site.kind, gem_project_id: site.project_id, name: site.name, owner: site.owner, parent: site.parent, km: site.km } : null },
         url: `https://firms.modaps.eosdis.nasa.gov/map/#d:7days;@${pt.lng.toFixed(3)},${pt.lat.toFixed(3)},13z`, fetchedAt,
       }));
     }
@@ -195,30 +208,40 @@ export const nasaFirms = {
   },
 };
 
-/** Per blast-furnace or DRI steel plant: days of the last seven with heat within NEAR_KM. */
-export function steelActivity(dets, { source, fetchedAt, now }) {
-  const { hot, release } = steelPlants();
+// Company names without GEM's share brackets, to tell whether owner and parent are the same company
+const bare = (s) => String(s || '').replace(/\s*\[[^\]]*\]/g, '').trim();
+
+const METRIC = { steel: 'steel_plant_heat', cement: 'cement_plant_heat', chemicals: 'chemical_plant_heat', oil_gas: 'oil_gas_field_heat' };
+
+/** Per hot site of one kind: days of the last seven with heat within the kind's radius, with owner and parent. */
+export function facilityHeat(kind, dets, { source, fetchedAt, now }) {
+  const t = facilities(kind);
   const g = gridOf(dets);
   const minute = `${now.toISOString().slice(0, 16)}:00Z`;
   const span = dets.span ?? 7;
-  return hot.map((p) => {
+  const r = t.radius_km;
+  return t.hot.map((p) => {
     const days = new Set();
     let n = 0, frp = 0;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       for (const d of g.get(`${Math.floor(p.lat) + dy}_${Math.floor(p.lng) + dx}`) || []) {
-        if (km(p, d) > NEAR_KM) continue;
+        if (km(p, d) > r) continue;
         days.add(d.day); n += 1; frp += d.frp;
       }
     }
-    const who = [p.owner, p.parent && p.parent !== `${p.owner} [100.0%]` ? `parent ${p.parent}` : null].filter(Boolean).join('; ');
+    const who = [p.owner, p.parent && bare(p.parent) !== bare(p.owner) ? `parent ${p.parent}` : null].filter(Boolean).join('; ');
+    const cap = p.capacity == null ? '' : kind === 'steel' ? `, ${p.capacity.toLocaleString('en-US')} kt/yr` : kind === 'cement' ? `, ${p.capacity} Mt/yr` : kind === 'oil_gas' ? `, ${p.capacity} million boe/yr` : '';
     return reading({
-      source, id: `steel:${p.project_id}:${minute.slice(0, 10)}`, at: minute, metric: 'steel_plant_heat',
+      source, id: `${kind}:${p.project_id}:${minute.slice(0, 10)}`, at: minute, metric: METRIC[kind],
       place: { id: `gem-${p.project_id}`, name: p.name, lat: p.lat, lng: p.lng },
       value: days.size, unit: 'UTC dates with heat',
-      summary: `${p.name}${who ? ` (${who})` : ''}: heat on ${days.size} of the last ${span} UTC dates${n ? `, ${n} detections` : ''}; ${p.status}, ${p.prod_type}${p.capacity_kt ? `, ${p.capacity_kt.toLocaleString('en-US')} kt/yr` : ''}`,
-      basis: 'derived', derivedFrom: `NASA FIRMS VIIRS (Suomi NPP) detections within ${NEAR_KM} km, matched to GEM Global Iron and Steel Tracker ${release}`,
+      summary: `${p.name}${who ? ` (${who})` : ''}: heat on ${days.size} of the last ${span} UTC dates${n ? `, ${n} detections` : ''}; ${p.status}${p.kind_detail ? `, ${p.kind_detail}` : ''}${cap}`,
+      basis: 'derived', derivedFrom: `NASA FIRMS VIIRS (Suomi NPP) detections within ${r} km, matched to GEM ${t.tracker} ${t.release}`,
       fields: { days: days.size, of_days: span, detections: n, mean_frp_mw: n ? Math.round((frp / n) * 10) / 10 : null, gem_project_id: p.project_id, owner: p.owner, parent: p.parent,
-        country: p.country, status: p.status, prod_type: p.prod_type, tech: p.tech, capacity_kt: p.capacity_kt, location_exact: p.location_exact, gem_release: release },
+        country: p.country, status: p.status, kind, kind_detail: p.kind_detail, tech: p.tech, capacity: p.capacity, capacity_unit: t.capacity_unit, radius_km: r,
+        location_exact: p.location_exact, gem_tracker: t.tracker, gem_release: t.release,
+        // the names the steel layer has always carried (Genome reads them)
+        ...(kind === 'steel' ? { prod_type: p.kind_detail, capacity_kt: p.capacity } : {}) },
       url: p.url, fetchedAt,
     });
   });
