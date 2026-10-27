@@ -147,6 +147,9 @@ is not republishing, so the gate doesn't apply there.
 | `adsb-lol` | live aircraft from the adsb.lol receiver network (ODbL): around any point (`mode=area`), every military-flagged aircraft worldwide (`mode=military`), or GPS interference per 1° cell inferred from aircraft position accuracy (`mode=gps`, the GPSJam method). Aircraft in the FAA LADD and PIA privacy programmes are never served | — |
 | `nasa-firms` | NASA FIRMS VIIRS heat detections from the keyless global files: fires of the last 24 hours (`mode=fires`), ~1 km spots hot on 3+ of the last seven days (`mode=persistent`, derived: industry, flares, volcanoes), and heat days at every blast-furnace and DRI steel plant in GEM's Global Iron and Steel Tracker with owner and parent company (`mode=steel`, derived) | — |
 | `nws-alerts` | active National Weather Service watches, warnings and advisories, one point per alert per county; by state, kind or event | — |
+| `usbr-rise` | Bureau of Reclamation daily storage at about 215 western reservoirs (RISE), with the week's change; by Reclamation region | — |
+| `digitraffic-ais` | live ship positions in Finnish waters and the northern Baltic (Fintraffic, CC BY 4.0), with name, type and destination; pleasure craft never served | — |
+| `corroboration` | derived: the same event seen by two independent sources or one. Earthquakes in USGS and EMSC (a relayed USGS-network solution counts once), and US wildfire incidents against FIRMS satellite heat | — |
 | `smithsonian-gvp` | Smithsonian Volcanoes of the World: volcanoes erupting since 1900 worldwide, and those erupting now | — (non-commercial) |
 
 ### Observed, modelled or derived
@@ -155,7 +158,8 @@ A sensor reading and a conclusion drawn from it are not the same thing, so a rea
 No `basis` means something observed it (a gauge, a seismometer, a receiver). `basis: "modelled"` is a
 model's output (Open-Meteo weather, GloFAS discharge, CAMS air quality). `basis: "derived"` is inferred
 from other readings and carries `derived_from` saying from what (GPS interference from aircraft NACp, the
-duck Weather Severity Index from modelled weather, persistent heat and steel-plant heat from FIRMS detections). Layer features always carry `basis`.
+duck Weather Severity Index from modelled weather, persistent heat and steel-plant heat from FIRMS detections,
+and corroboration, which pairs two sources on one event and says when an apparent second source is only relaying the first). Layer features always carry `basis`.
 
 The rest of the catalogue is listed but not fetched yet. Adding a fetcher is the most useful
 contribution; see [CONTRIBUTING.md](CONTRIBUTING.md).

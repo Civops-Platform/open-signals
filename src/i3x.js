@@ -64,6 +64,10 @@ export const I3X_LAYERS = {
   persistent_heat: {},
   steel_plant_heat: {},
   weather_alerts: {},
+  reservoirs_west: {},
+  quake_corroboration: { q: { window: 'day' } },
+  fire_corroboration: {},
+  ships_baltic: {},
 };
 
 const utc = (d) => new Date(d).toISOString().replace(/\.000Z$/, 'Z');
