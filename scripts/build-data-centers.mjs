@@ -3,8 +3,9 @@
  * Build catalog/data-centers.json: every data center mapped in OpenStreetMap (telecom=data_center,
  * building=data_center, or construction=data_center), with name, operator and status, from Overpass.
  *
- *   node scripts/build-data-centers.mjs              # asks the Overpass mirrors below in turn
- *   node scripts/build-data-centers.mjs dump.json    # or reads a saved Overpass answer
+ *   node scripts/build-data-centers.mjs                      # asks the Overpass mirrors below in turn
+ *   node scripts/build-data-centers.mjs dump.json            # or reads a saved Overpass answer
+ *   node scripts/build-data-centers.mjs --out /data/x.json   # writes elsewhere (the weekly rebuild on a server)
  *
  * The worldwide query takes about three minutes, too long to run per request, so the table is built ahead
  * and rebuilt on a schedule. OpenStreetMap data is ODbL 1.0: this file is a derived database and is offered
@@ -12,7 +13,7 @@
  * (AWS, Amazon Web Services) and kept as written in `operator_raw`.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 const MIRRORS = ['https://overpass.private.coffee/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const QUERY = '[out:json][timeout:300];(nwr["telecom"="data_center"];nwr["building"="data_center"];nwr["construction"="data_center"];);out center tags;';
@@ -37,7 +38,10 @@ async function overpass() {
   throw new Error('no Overpass mirror answered');
 }
 
-const d = JSON.parse(process.argv[2] ? readFileSync(process.argv[2], 'utf8') : await overpass());
+const args = process.argv.slice(2);
+const outAt = args.indexOf('--out');
+const out = outAt >= 0 ? args.splice(outAt, 2)[1] : null;
+const d = JSON.parse(args[0] ? readFileSync(args[0], 'utf8') : await overpass());
 const fields = ['osm_id', 'name', 'operator', 'operator_raw', 'status', 'city', 'region', 'country', 'lat', 'lng', 'start_date'];
 const sites = [];
 for (const e of d.elements || []) {
@@ -49,8 +53,11 @@ for (const e of d.elements || []) {
   sites.push([`${e.type}/${e.id}`, t.name || null, norm(raw), raw, status, t['addr:city'] || null, t['addr:state'] || t['addr:province'] || null, t['addr:country'] || null,
     Math.round(lat * 1e5) / 1e5, Math.round(lng * 1e5) / 1e5, t.start_date || null]);
 }
-writeFileSync(new URL('../catalog/data-centers.json', import.meta.url), JSON.stringify({
+const target = out || new URL('../catalog/data-centers.json', import.meta.url);
+if (sites.length < 1000) throw new Error(`only ${sites.length} sites: Overpass answered short, keeping the last table`);
+writeFileSync(`${target}.tmp`, JSON.stringify({
   about: 'Data centers mapped in OpenStreetMap (telecom=data_center, building=data_center, construction=data_center), with normalised operator. Derived from OpenStreetMap; ODbL 1.0, © OpenStreetMap contributors. Built by scripts/build-data-centers.mjs.',
   source: 'https://www.openstreetmap.org', license: 'ODbL 1.0', attribution: '© OpenStreetMap contributors', built: new Date().toISOString().slice(0, 10), fields, sites,
 }));
+renameSync(`${target}.tmp`, target);
 console.log(`${sites.length} data centers written, ${sites.filter((s) => s[4] === 'construction').length} under construction`);

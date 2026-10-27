@@ -8,6 +8,9 @@ import { createService, LAYERS } from '../src/service.js';
 import { I3X_LAYERS } from '../src/i3x.js';
 import { source } from '../src/catalog.js';
 import { NOW, res, stubFetch, ctx } from './helpers.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const valid = (rs) => rs.forEach((r) => assert.deepEqual(validateReading(r), [], JSON.stringify(r)));
 
@@ -78,4 +81,23 @@ test('layer: data_centers features carry operator and status', async () => {
   const L = await createService({ fetch: stubFetch([]), env: {}, now: () => NOW }).layer('data_centers', { operator: 'Equinix' });
   assert.ok(L.features.length > 50);
   assert.ok(L.features.every((x) => x.properties.operator === 'Equinix' && x.properties.basis === 'observed'));
+});
+
+test('a rebuilt table in the data dir is read when newer, and re-read when it changes', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'os-dc-'));
+  try {
+    assert.equal(dataCenterTable(dir).from, 'committed', 'nothing rebuilt yet');
+    mkdirSync(join(dir, 'data_centers'));
+    const f = join(dir, 'data_centers', 'data-centers.json');
+    const one = (name) => JSON.stringify({ built: '2026-11-01', license: 'ODbL 1.0', fields: ['osm_id', 'name', 'operator', 'operator_raw', 'status', 'city', 'region', 'country', 'lat', 'lng', 'start_date'],
+      sites: [['way/1', name, 'Microsoft', 'Microsoft', 'construction', null, null, 'US', 41, -96, null]] });
+    writeFileSync(f, one('First'));
+    const later = Date.now() / 1000 + 60;
+    utimesSync(f, later, later);
+    const t = dataCenterTable(dir);
+    assert.deepEqual([t.from, t.all.length, t.all[0].name], ['rebuilt', 1, 'First']);
+    writeFileSync(f, one('Second'));
+    utimesSync(f, later + 60, later + 60);
+    assert.equal(dataCenterTable(dir).all[0].name, 'Second');
+  } finally { rmSync(dir, { recursive: true, force: true }); dataCenterTable(null); }
 });

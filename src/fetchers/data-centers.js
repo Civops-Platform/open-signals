@@ -1,7 +1,9 @@
 /**
  * Data centers mapped in OpenStreetMap, from catalog/data-centers.json (built by scripts/build-data-centers.mjs;
  * ODbL 1.0, © OpenStreetMap contributors). No network: the worldwide Overpass query is too slow to run per
- * request, so the table is rebuilt on a schedule. OSM is volunteer-mapped: coverage is good for large
+ * request, so the table is rebuilt on a schedule. A server that rebuilds it weekly writes
+ * $OPEN_SIGNALS_DATA_DIR/data_centers/data-centers.json; when that file exists and is newer than the committed
+ * one it is read instead, and re-read whenever it changes. OSM is volunteer-mapped: coverage is good for large
  * campuses in North America and Europe and thin elsewhere, and a site under construction appears only once
  * someone maps it.
  *   params.operator  case-insensitive match on the normalised operator (e.g. "Microsoft", "equinix")
@@ -9,15 +11,24 @@
  *   params.bbox      xmin,ymin,xmax,ymax
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { reading } from '../contract.js';
 
-let table = null;
-export function dataCenterTable() {
-  if (!table) {
-    const t = JSON.parse(readFileSync(new URL('../../catalog/data-centers.json', import.meta.url), 'utf8'));
+const COMMITTED = new URL('../../catalog/data-centers.json', import.meta.url);
+let table = null, loadedFrom = null, loadedMtime = 0;
+const mtime = (p) => { try { return statSync(p).mtimeMs; } catch { return 0; } };
+
+/** The table to read: the server's rebuilt copy when it is there and newer, else the committed one. */
+export function dataCenterTable(dataDir = process.env.OPEN_SIGNALS_DATA_DIR) {
+  const rebuilt = dataDir ? join(dataDir, 'data_centers', 'data-centers.json') : null;
+  const path = rebuilt && mtime(rebuilt) > mtime(COMMITTED) ? rebuilt : COMMITTED;
+  const m = mtime(path);
+  if (!table || path !== loadedFrom || m !== loadedMtime) {
+    const t = JSON.parse(readFileSync(path, 'utf8'));
     const ix = Object.fromEntries(t.fields.map((k, i) => [k, i]));
-    table = { ...t, all: t.sites.map((s) => Object.fromEntries(t.fields.map((k) => [k, s[ix[k]]]))) };
+    table = { ...t, all: t.sites.map((s) => Object.fromEntries(t.fields.map((k) => [k, s[ix[k]]]))), from: path === COMMITTED ? 'committed' : 'rebuilt' };
+    loadedFrom = path; loadedMtime = m;
   }
   return table;
 }
@@ -52,7 +63,7 @@ export const osmDataCenters = {
         place: { id: `osm-${s.osm_id.replace('/', '-')}`, name, lat: s.lat, lng: s.lng },
         value: null, unit: null,
         summary: `${name}${s.operator && !name.includes(s.operator) ? ` (${s.operator})` : ''}${where ? `, ${where}` : ''}${s.status === 'construction' ? ': under construction' : ''}`,
-        fields: { operator: s.operator, operator_raw: s.operator_raw, status: s.status, city: s.city, region: s.region, country: s.country, start_date: s.start_date, osm_id: s.osm_id, table_built: t.built },
+        fields: { operator: s.operator, operator_raw: s.operator_raw, status: s.status, city: s.city, region: s.region, country: s.country, start_date: s.start_date, osm_id: s.osm_id, table_built: t.built, table_from: t.from },
         url: `https://www.openstreetmap.org/${s.osm_id}`, fetchedAt: now.toISOString(),
       }));
     }
