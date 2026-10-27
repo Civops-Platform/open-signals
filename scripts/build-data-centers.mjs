@@ -74,6 +74,12 @@ for (const e of d.elements || []) {
 }
 const target = out || new URL('../catalog/data-centers.json', import.meta.url);
 if (sites.length < 1000) throw new Error(`only ${sites.length} sites: Overpass answered short, keeping the last table`);
+// Mirrors are not in step: one central-US tile came back 791 from one mirror and 610 from another on 2026-10-27.
+// A table more than 10% smaller than the one it would replace is a short answer, not a shrinking world.
+try {
+  const before = JSON.parse(readFileSync(target, 'utf8')).sites.length;
+  if (sites.length < before * 0.9) throw new Error(`${sites.length} sites against ${before} last time: a mirror answered short, keeping the last table`);
+} catch (e) { if (!/ENOENT/.test(e.code || '') && /keeping the last table/.test(e.message)) throw e; }
 writeFileSync(`${target}.tmp`, JSON.stringify({
   about: 'Data centers mapped in OpenStreetMap (telecom=data_center, building=data_center, construction=data_center), with normalised operator. Derived from OpenStreetMap; ODbL 1.0, © OpenStreetMap contributors. Built by scripts/build-data-centers.mjs.',
   source: 'https://www.openstreetmap.org', license: 'ODbL 1.0', attribution: '© OpenStreetMap contributors', built: new Date().toISOString().slice(0, 10), fields, sites,
