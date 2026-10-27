@@ -27,6 +27,8 @@ import { amsBargeLocks, btsBorderCrossings, epaTri, epaCampd } from './us-freigh
 import { openMeteoFlood, openMeteoAir } from './open-meteo-global.js';
 import { smithsonianVolcanoes } from './volcanoes-world.js';
 import { adsbLol } from './flights.js';
+import { nasaFirms } from './firms.js';
+import { nwsAlerts } from './nws-alerts.js';
 import { usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs } from './us-water-hazards.js';
 
 export const FETCHERS = Object.fromEntries(
@@ -35,5 +37,5 @@ export const FETCHERS = Object.fromEntries(
     openMeteoFlood, openMeteoAir, smithsonianVolcanoes,
     amsBargeLocks, btsBorderCrossings, epaTri, epaCampd,
     usaceMvnLocks, nrcsSnotel, usDroughtMonitor, spcStormReports, nifcWfigs,
-    adsbLol].map((x) => [x.source, x]),
+    adsbLol, nasaFirms, nwsAlerts].map((x) => [x.source, x]),
 );

@@ -26,7 +26,7 @@ const TTL_MIN = {
   'gem-trackers': 1440, 'open-meteo-flood': 720, 'open-meteo-air': 180, 'smithsonian-gvp': 720,
   'usda-ams-barge': 360, 'bts-border-crossings': 1440, 'epa-tri': 1440, 'epa-campd': 1440,
   'usace-mvn-locks': 30, 'nrcs-snotel': 360, 'us-drought-monitor': 720, 'noaa-spc-reports': 10, 'nifc-wfigs': 15,
-  'adsb-lol': 2,
+  'adsb-lol': 2, 'nasa-firms': 30, 'nws-alerts': 5,
 };
 
 // Places a fetcher reads when the caller names none.
@@ -308,4 +308,17 @@ export const LAYERS = {
   gps_interference: { label: 'GPS interference, inferred from aircraft (adsb.lol)', source: 'adsb-lol', metric: 'gps_interference', unit: '% of aircraft degraded', value: valueOf, events: true, q: { mode: 'gps' },
     extra: (r) => ({ level: r.fields.level, aircraft: r.fields.aircraft, degraded: r.fields.degraded }),
     read: 'Derived, not measured. Per 1° cell, the share of airborne aircraft (ADS-B v1+) reporting position accuracy NACp below 8, the GPSJam method; cells with fewer than 5 such aircraft are left out. Under 2% low, 2-10% medium, over 10% high; a cell with only one degraded aircraft stays low. Default looks at five regions (Baltic, Eastern Mediterranean, Persian Gulf, Red Sea, and the US Great Lakes as a quiet control) within radius= nm (default 250); lat=/lng= looks anywhere else. Avionics faults also lower NACp, so one cell on its own is a lead, not a finding.' },
+  weather_alerts: { label: 'Weather watches and warnings (NWS)', source: 'nws-alerts', metric: 'weather_alert', unit: 'severity', value: valueOf, events: true,
+    extra: (r) => ({ event: r.fields.event, severity: r.fields.severity, urgency: r.fields.urgency, onset: r.fields.onset, ends: r.fields.ends, expires: r.fields.expires }),
+    read: 'Active NWS alerts, one point per alert per county (Census internal point). Value is NWS severity: 4 extreme, 3 severe, 2 moderate, 1 minor. state=XX, kind=warning|watch|advisory and event= (e.g. Red Flag Warning) narrow it; marine=true adds marine alerts at their polygon centre. Not a substitute for the official warning: follow NWS.' },
+  // Satellite heat (src/fetchers/firms.js)
+  fires: { label: 'Fires and heat, last 24 hours (NASA FIRMS VIIRS)', source: 'nasa-firms', metric: 'fire_detection', unit: 'MW radiative power', value: valueOf, events: true, q: { mode: 'fires' },
+    extra: (r) => ({ confidence: r.fields.confidence, daynight: r.fields.daynight }),
+    read: 'Every VIIRS 375 m detection (NOAA-20) of the last 24 hours at nominal or high confidence, inside bbox (default the whole world, the 5,000 strongest). A detection is heat, not necessarily a wildfire: gas flares, steel works and volcanoes show too; the persistent_heat layer separates those.' },
+  persistent_heat: { label: 'Heat that stays put: industry, flares, volcanoes (from NASA FIRMS)', source: 'nasa-firms', metric: 'persistent_heat', unit: 'UTC dates with heat', value: valueOf, events: true, q: { mode: 'persistent' },
+    extra: (r) => ({ of_days: r.fields.of_days, detections: r.fields.detections, mean_frp_mw: r.fields.mean_frp_mw, near_steel_plant: r.fields.near_steel_plant?.name ?? null, owner: r.fields.near_steel_plant?.owner ?? null, near_plant: r.fields.near_plant?.name ?? null }),
+    read: 'Derived. ~1 km cells where VIIRS (Suomi NPP) saw heat on 3 or more of the last seven days. Wildfires move; heat that stays is usually a steel works, cement kiln, refinery, gas flare or volcano, but a long fire can qualify. The nearest steel plant (GEM Global Iron and Steel Tracker) and thermal power plant (GEM Global Integrated Power Tracker) within 3 km are named.' },
+  steel_plant_heat: { label: 'Steel plants: is the furnace hot? (NASA FIRMS × GEM)', source: 'nasa-firms', metric: 'steel_plant_heat', unit: 'UTC dates with heat', value: valueOf, events: true, q: { mode: 'steel' },
+    extra: (r) => ({ of_days: r.fields.of_days, detections: r.fields.detections, owner: r.fields.owner, parent: r.fields.parent, status: r.fields.status, prod_type: r.fields.prod_type, capacity_kt: r.fields.capacity_kt }),
+    read: 'Derived. Every blast-furnace or DRI steel plant in GEM\'s Global Iron and Steel Tracker (operating, pre-retirement, mothballed or building), with how many of the last seven or eight UTC dates VIIRS saw heat within 3 km, and the owner and parent company. Heat at a plant listed mothballed is worth a look; no heat is weaker evidence (cloud hides it, and some units run cooler). Electric-arc mills are not listed: they rarely show.' },
 };

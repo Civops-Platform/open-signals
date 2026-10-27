@@ -71,7 +71,7 @@ test('readings: limit, since and unknown sources are checked', async () => {
   await assert.rejects(svc.readings('usgs-earthquakes', { limit: '0' }), (e) => e.status === 400);
   await assert.rejects(svc.readings('usgs-earthquakes', { since: 'yesterday' }), (e) => e.status === 400);
   await assert.rejects(svc.readings('nope', {}), (e) => e.status === 404);
-  await assert.rejects(svc.readings('nasa-firms', {}), (e) => e.status === 404 && /no fetcher/.test(e.message));
+  await assert.rejects(svc.readings('celestrak', {}), (e) => e.status === 404 && /no fetcher/.test(e.message));
   const r = await svc.readings('usgs-earthquakes', { since: '2026-10-11' });
   assert.equal(r.count, 0);
 });
