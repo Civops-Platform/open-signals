@@ -33,7 +33,7 @@ function llmsTxt() {
   return [
     '# open-signals',
     '',
-    `> ${SERVER_JSON.description} Every reading carries its source, when it was observed and its licence.`,
+    `> ${SERVER_JSON.description}`,
     '',
     '## For agents',
     `- MCP (streamable HTTP, no key): ${SERVER_JSON.remotes[0].url}`,
