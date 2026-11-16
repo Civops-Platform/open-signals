@@ -1,6 +1,7 @@
 {
   "name": "open-signals",
   "version": "0.1.0",
+  "mcpName": "io.github.Civops-Platform/open-signals",
   "description": "Public data signals with provenance and licence on every reading: a source catalogue, fetchers, REST, MCP and GeoJSON layers.",
   "type": "module",
   "license": "Apache-2.0",
@@ -15,7 +16,7 @@
     "./mcp": "./src/mcp.js",
     "./i3x": "./src/i3x.js"
   },
-  "files": ["bin", "src", "catalog", "LICENSE", "NOTICE", "README.md"],
+  "files": ["bin", "src", "catalog", "server.json", "LICENSE", "NOTICE", "README.md"],
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node src/server.js",

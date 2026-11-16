@@ -325,3 +325,15 @@ test('an upstream that refuses for rate is rested, and the last good answer serv
   const fresh = createService({ fetch: f, env: {}, now: () => new Date(t) });
   await assert.rejects(fresh.readings('usgs-earthquakes', {}), (e) => e.status === 429 || e.status === 502 || e.status === 503);
 });
+
+test('HTTP: discovery files for crawlers and agents', async () => {
+  await withServer({}, [], async (base) => {
+    const llms = await (await fetch(`${base}/llms.txt`)).text();
+    assert.match(llms, /^# open-signals/);
+    assert.match(llms, /https:\/\/open-signals\.civops\.io\/mcp/);
+    assert.match(await (await fetch(`${base}/robots.txt`)).text(), /Allow: \//);
+    const card = await (await fetch(`${base}/.well-known/mcp/server-card.json`)).json();
+    assert.equal(card.name, 'io.github.Civops-Platform/open-signals');
+    assert.equal(card.remotes[0].type, 'streamable-http');
+  });
+});

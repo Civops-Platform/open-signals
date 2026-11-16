@@ -21,8 +21,38 @@ import { openapi } from './openapi.js';
 import { createDatasets } from './datasets.js';
 import { zipCentroid } from './fetchers/zip.js';
 import { createI3x } from './i3x.js';
+import { readFileSync } from 'node:fs';
 
 const MAX_BODY = 1_000_000;
+
+// Discovery for crawlers and AI agents: robots.txt, llms.txt (https://llmstxt.org) and an MCP server card
+// built from server.json, the same file the official MCP Registry listing comes from.
+const SERVER_JSON = JSON.parse(readFileSync(new URL('../server.json', import.meta.url), 'utf8'));
+const ROBOTS = 'User-agent: *\nAllow: /\n';
+function llmsTxt() {
+  return [
+    '# open-signals',
+    '',
+    `> ${SERVER_JSON.description} Every reading carries its source, when it was observed and its licence.`,
+    '',
+    '## For agents',
+    `- MCP (streamable HTTP, no key): ${SERVER_JSON.remotes[0].url}`,
+    `- MCP Registry name: ${SERVER_JSON.name}`,
+    '- OpenAPI: https://open-signals.civops.io/openapi.json',
+    '- CESMII i3X 1.0 (read-only): https://open-signals.civops.io/i3x/v1',
+    '',
+    '## REST',
+    '- [Sources](https://open-signals.civops.io/v1/sources): the catalogue, with licence and coverage per source',
+    '- [Readings](https://open-signals.civops.io/v1/readings?source=usgs-earthquakes): current readings for one source',
+    '- [Layers](https://open-signals.civops.io/v1/layers): GeoJSON map layers',
+    '- [Datasets](https://open-signals.civops.io/v1/datasets): static public datasets',
+    '',
+    '## Project',
+    `- Source: ${SERVER_JSON.repository.url} (Apache-2.0)`,
+    '- Explorer: https://theonedegreedispatch.com/signals/',
+    '',
+  ].join('\n');
+}
 
 export function createServer({ service = createService(), env = process.env, log = console, datasets = createDatasets({ env }), i3x = createI3x({ service, env, warm: !!env.I3X_TOKENS }) } = {}) {
   const limit = Number(env.RATE_LIMIT_PER_MIN || 60);
@@ -79,6 +109,11 @@ export function createServer({ service = createService(), env = process.env, log
       });
     }
     if (p === '/health') return send(res, 200, { ok: true });
+    if (p === '/robots.txt' || p === '/llms.txt') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3600' });
+      return res.end(p === '/robots.txt' ? ROBOTS : llmsTxt());
+    }
+    if (p === '/.well-known/mcp/server-card.json' || p === '/.well-known/mcp.json') return send(res, 200, SERVER_JSON);
     if (p === '/openapi.json') return send(res, 200, openapi);
     if (p === '/v1/sources') {
       const list = searchSources(q).map((s) => ({ ...s, servable_here: service.fetchableIds('serve').includes(s.id) }));
